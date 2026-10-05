@@ -40,8 +40,8 @@ Fell free to join !
 |-----------------------------------------------|-----------|
 | Arena Football                                | ⚠️ 🔒     |
 | Arena Football Road To Glory                  | ⚠️ 🔒     |
-| Burnout 3 - Takedown                          | ❌         |
-| Burnout Revenge                               | ❌         |
+| Burnout 3 - Takedown                          | ✅ 🔒      |
+| Burnout Revenge                               | ✅ 🔒      |
 | FIFA Soccer 2004                              | ❌         |
 | FIFA 06, 07, 08                               | ⚠️        |
 | FIFA World Cup Germany 2006                   | ⚠️        |
@@ -87,7 +87,7 @@ Fell free to join !
 | Fight Night Round 3               | ⚠️     |
 | MADDEN 07, 08, 09, 10             | ⚠️     |
 | Medal of Honor: Heroes            | ✅      |
-| Medal of Honor: Heroes 2          | ❌      |
+| Medal of Honor: Heroes 2          | ✅      |
 | NBA Live 06, 07, 08*              | ⚠️     |
 | NCAA 07*                          | ⚠️     |
 | Need for Speed: Most Wanted 5-1-0 | ✅      |
@@ -104,7 +104,7 @@ Fell free to join !
 
 | Game                     | Status |
 |--------------------------|--------|
-| Medal of Honor: Heroes 2 | ❌      |
+| Medal of Honor: Heroes 2 | ✅      |
 
 Notes:
 
