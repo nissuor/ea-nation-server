@@ -8,7 +8,7 @@ import java.net.Socket;
 import java.util.Map;
 import static eu.eahub.utils.SocketUtils.getValueFromSocket;
 
-/** Minimal, honest career view for the local PC Coach server. */
+/** Career statbook responses for PC NFL Head Coach. */
 @Service
 @RequiredArgsConstructor
 public class CoachCareerService {

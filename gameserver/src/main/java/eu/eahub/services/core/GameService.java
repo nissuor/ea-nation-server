@@ -955,9 +955,6 @@ public class GameService {
             if (sysflags != null || params != null) gameRepository.save(game);
             broadcastGameStateToPlayers(wrapper.getPersonaConnectionEntity());
         }
-        // Restrict diagnostics to game setup, never account authentication.
-        log.debug("PC Coach setup flags={} sysflags={} params={} userparamsHex={}", flags, sysflags, params,
-                userparams == null ? null : HexFormat.of().formatHex(userparams.getBytes(StandardCharsets.ISO_8859_1)));
         socketWriter.write(socket, new SocketData("gset", null, game == null ? null : gameUtils.getGameInfo(game)));
     }
 
