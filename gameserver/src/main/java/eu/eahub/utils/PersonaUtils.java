@@ -86,7 +86,9 @@ public class PersonaUtils {
                 {"I", String.valueOf(accountEntity.getId())},
                 {"M", hostPrefix + accountEntity.getName()},
                 {"N", hostPrefix + personaEntity.getPers()},
-                {"F", "U"},
+                // Coach's +usr handler copies U-marked records into its local persona.
+                // Other players must never carry this flag to the recipient.
+                {"F", "PC_COACH06".equals(vers) && !socket.equals(socketWrapper.getSocket()) ? "" : "U"},
                 {"P", "80"},
                 {"S", stats},
                 {"X", auxText},
@@ -104,8 +106,8 @@ public class PersonaUtils {
                 {"CI", "0"},
                 {"CT", "0"},
                 // 0x800225E0
-                {"A", socket.getInetAddress().getHostAddress()},
-                {"LA", socket.getInetAddress().getHostAddress()},
+                {"A", socketWrapper.getSocket().getInetAddress().getHostAddress()},
+                {"LA", socketWrapper.getSocket().getInetAddress().getHostAddress()},
                 // 0x80021384
                 {"C", "4000,,7,1,1,,1,1,5553"},
                 {"RI", room != null ? String.valueOf(room.getId()) : "0"}, // Room identifier

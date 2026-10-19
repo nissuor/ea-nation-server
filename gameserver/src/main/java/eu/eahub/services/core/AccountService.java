@@ -201,7 +201,9 @@ public class AccountService {
                 }
 
                 PersonaConnectionEntity personaConnectionEntity = new PersonaConnectionEntity();
-                personaConnectionEntity.setAddress(SocketUtils.handleLocalhostIp(socket.getRemoteSocketAddress().toString()));
+                // This is also the socket lookup/cleanup key. Rewriting loopback
+                // to the machine's LAN address makes live sessions look absent.
+                personaConnectionEntity.setAddress(socketWrapper.getIdentifier());
                 String gameName = gameServerService.getNameByPort(socket.getLocalPort());
                 personaConnectionEntity.setVers(gameName);
                 log.info("Login: user={}, VERS={}, SLUS={}, game={}, port={}", accountEntity.getName(), vers, slus, gameName, socket.getLocalPort());

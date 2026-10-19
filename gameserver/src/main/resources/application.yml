@@ -66,6 +66,16 @@ game:
         domain: 'pcnfs06.ea.com'
       ports:
         - port: 30920
+    - name: 'PC_COACH06' # NFL Head Coach (experimental; see docs/pc-head-coach.md)
+      enabled: false
+      sdk: '3.9.5.2'
+      aries: true
+      p2p: true
+      ssl:
+        enabled: false # Local tests used a client patched for plain Aries
+        domain: 'pccoach06.ea.com'
+      ports:
+        - port: 31320
     - name: 'PS2_AFL06' # Arena Football
       enabled: false
       sdk: '3.9.5.1'

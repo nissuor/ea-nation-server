@@ -122,11 +122,13 @@ public class RoomService {
                 if (clientWrapper.getPersonaEntity() != null) {
                     Room clientRoom = getRoomByPersonaId(clientWrapper.getPersonaEntity().getId());
                     if (clientRoom != null && clientRoom.getId().equals(roomId)) {
-                        socketWriter.write(socket, new SocketData("+usr", null, personaUtils.getPersonaInfo(clientWrapper.getSocket(), clientWrapper, room)));
-                        socketWriter.write(socket, new SocketData("+who", null, personaUtils.getPersonaInfo(clientWrapper.getSocket(), clientWrapper, room)));
+                        socketWriter.write(socket, new SocketData("+usr", null, personaUtils.getPersonaInfo(socket, clientWrapper, room)));
+                        if (!"PC_COACH06".equals(socketWrapper.getPersonaConnectionEntity().getVers())) {
+                            socketWriter.write(socket, new SocketData("+who", null, personaUtils.getPersonaInfo(socket, clientWrapper, room)));
+                        }
                         // Also notify each client in the room about the new user
                         if (!clientWrapper.getSocket().equals(socket)) {
-                            socketWriter.write(clientWrapper.getSocket(), new SocketData("+usr", null, personaUtils.getPersonaInfo(socket, socketWrapper, room)));
+                            socketWriter.write(clientWrapper.getSocket(), new SocketData("+usr", null, personaUtils.getPersonaInfo(clientWrapper.getSocket(), socketWrapper, room)));
                             socketWriter.write(clientWrapper.getSocket(), new SocketData("+who", null, personaUtils.getPersonaInfo(clientWrapper.getSocket(), clientWrapper, room)));
                         }
                         // Remember the player who he is... (FIFA on PS2 forget about his country otherwise)
@@ -422,7 +424,7 @@ public class RoomService {
                             if (roomPlayerRoom != null && roomPlayerRoom.getId().equals(roomId)) {
                                 socketWriter.write(playerWrapper.getSocket(),
                                         new SocketData("+usr", null,
-                                                personaUtils.getPersonaInfo(roomPlayerWrapper.getSocket(), roomPlayerWrapper, room)));
+                                                personaUtils.getPersonaInfo(playerWrapper.getSocket(), roomPlayerWrapper, room)));
                             }
                         }
                     }

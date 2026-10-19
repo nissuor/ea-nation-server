@@ -98,6 +98,13 @@ public class AuthService {
         }).collect(Collectors.toMap(data -> data[0], data -> data[1]));
 
         String newsName = getValueFromSocket(socketData.getInputMessage(), "NAME");
+        if ("PC_COACH06".equals(name)) {
+            // No real Head Coach roster is hosted. Its download completion
+            // parser also crashes on the extensionless placeholder URL.
+            // The local test client explicitly retains its installed roster.
+            content.remove("ROSTER_URL");
+            content.remove("ROSTER_VER");
+        }
         // if name exists and is a number
         if (newsName != null && newsName.matches("\\d+")) {
             socketData.setIdMessage("newsnew" + newsName);

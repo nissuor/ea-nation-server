@@ -14,7 +14,9 @@ public class SocketUtils {
     public static final String DATETIME_FORMAT = "yyyy.M.d-H:mm:ss";
     public static final String SPACE_CHAR = " ";
     public static final String TAB_CHAR = "\t";
-    public static final String RETURN_CHAR = "\\R";
+    // This is a byte protocol. ISO-8859-1 0x85 can occur inside encoded
+    // USERPARAMS and must not be interpreted as a Unicode line separator.
+    public static final String RETURN_CHAR = "\\r\\n|\\r|\\n";
     public static final String NEWLINE_CHAR = "\n";
 
     /**
@@ -48,10 +50,10 @@ public class SocketUtils {
 
     public static String getValueFromSocket(String data, String key, String splitter) {
         String result = null;
-        String[] entries = data.split(splitter);
+        String[] entries = data.replaceFirst("\\x00+$", "").split(splitter);
         for (String entry : entries) {
-            String[] parts = entry.trim().split("=");
-            if (key.equals(parts[0])) {
+            String[] parts = entry.split("=", 2);
+            if (key.equals(parts[0].trim())) {
                 if (parts.length > 1) {
                     result = parts[1];
                 }

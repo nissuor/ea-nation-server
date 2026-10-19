@@ -201,6 +201,11 @@ public class GameService {
      */
     public void gset(Socket socket, SocketData socketData, SocketWrapper socketWrapper) {
         PersonaConnectionEntity personaConnectionEntity = socketWrapper.getPersonaConnectionEntity();
+        if ("PC_COACH06".equals(personaConnectionEntity.getVers())
+                && getValueFromSocket(socketData.getInputMessage(), "KICK") == null) {
+            setCoachGameState(socket, socketData, socketWrapper);
+            return;
+        }
         if (gameServerService.isP2P(personaConnectionEntity.getVers())) {
             // On NHL, the value is 0 or 1 to know if the client is ready or not
             String userflags = getValueFromSocket(socketData.getInputMessage(), "USERFLAGS");
@@ -931,6 +936,29 @@ public class GameService {
                 socketWriter.write(socketWrapper.getSocket(), new SocketData("+mgm", null, mgmContent));
             }
         }
+    }
+
+    /** Apply the complete PC Coach update before broadcasting a single snapshot. */
+    private synchronized void setCoachGameState(Socket socket, SocketData data, SocketWrapper wrapper) {
+        String flags = getValueFromSocket(data.getInputMessage(), "USERFLAGS");
+        String userparams = getValueFromSocket(data.getInputMessage(), "USERPARAMS");
+        String sysflags = getValueFromSocket(data.getInputMessage(), "SYSFLAGS");
+        String params = getValueFromSocket(data.getInputMessage(), "PARAMS");
+        GameEntity game = gameConnectionRepository
+                .findByPersonaConnectionIdAndEndTimeIsNull(wrapper.getPersonaConnectionEntity().getId())
+                .map(GameConnectionEntity::getGame).orElse(null);
+        if (flags != null) wrapper.setUserflags(flags);
+        if (userparams != null) wrapper.setUserparams(userparams);
+        if (game != null) {
+            if (sysflags != null) game.setSysflags(sysflags);
+            if (params != null) game.setParams(params);
+            if (sysflags != null || params != null) gameRepository.save(game);
+            broadcastGameStateToPlayers(wrapper.getPersonaConnectionEntity());
+        }
+        // Restrict diagnostics to game setup, never account authentication.
+        log.debug("PC Coach setup flags={} sysflags={} params={} userparamsHex={}", flags, sysflags, params,
+                userparams == null ? null : HexFormat.of().formatHex(userparams.getBytes(StandardCharsets.ISO_8859_1)));
+        socketWriter.write(socket, new SocketData("gset", null, game == null ? null : gameUtils.getGameInfo(game)));
     }
 
     /**

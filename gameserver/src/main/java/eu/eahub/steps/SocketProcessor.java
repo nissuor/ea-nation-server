@@ -7,6 +7,7 @@ import eu.eahub.services.core.*;
 import eu.eahub.services.server.SocketManager;
 import eu.eahub.services.social.BuddyService;
 import eu.eahub.services.stats.StatsService;
+import eu.eahub.services.stats.CoachCareerService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -28,6 +29,7 @@ public class SocketProcessor {
     private final BuddyService buddyService;
     private final RoomService roomService;
     private final UserSetService userSetService;
+    private final CoachCareerService coachCareerService;
 
     /**
      * Dispatch to appropriate service based on request type
@@ -38,6 +40,14 @@ public class SocketProcessor {
     public void process(Socket socket, SocketData socketData) {
         SocketWrapper socketWrapper = socketManager.getSocketWrapperBySocket(socket);
         BuddySocketWrapper buddySocketWrapper = socketManager.getBuddySocketWrapperBySocket(socket);
+        if (socketWrapper != null && socketWrapper.getPersonaConnectionEntity() != null
+                && "PC_COACH06".equals(socketWrapper.getPersonaConnectionEntity().getVers())) {
+            switch (socketData.getIdMessage()) {
+                case "slst": coachCareerService.slst(socket, socketData); return;
+                case "sviw": coachCareerService.sviw(socket, socketData); return;
+                case "sdta": coachCareerService.sdta(socket, socketData); return;
+            }
+        }
         switch (socketData.getIdMessage()) {
             case ("~png"):
                 break;
