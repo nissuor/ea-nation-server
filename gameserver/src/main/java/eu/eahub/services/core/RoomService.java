@@ -23,6 +23,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static eu.eahub.services.server.GameServerService.PC_COACH06;
 import static eu.eahub.services.server.GameServerService.PS2_FIFA08;
 import static eu.eahub.utils.SocketUtils.TAB_CHAR;
 import static eu.eahub.utils.SocketUtils.getValueFromSocket;
@@ -122,17 +123,25 @@ public class RoomService {
                 if (clientWrapper.getPersonaEntity() != null) {
                     Room clientRoom = getRoomByPersonaId(clientWrapper.getPersonaEntity().getId());
                     if (clientRoom != null && clientRoom.getId().equals(roomId)) {
-                        socketWriter.write(socket, new SocketData("+usr", null, personaUtils.getPersonaInfo(socket, clientWrapper, room)));
-                        if (!"PC_COACH06".equals(socketWrapper.getPersonaConnectionEntity().getVers())) {
-                            socketWriter.write(socket, new SocketData("+who", null, personaUtils.getPersonaInfo(socket, clientWrapper, room)));
+                        if (PC_COACH06.equals(socketWrapper.getPersonaConnectionEntity().getVers())) {
+                            // NFL Head Coach takes the identity of any +who or F=U record, so only send them about the recipient
+                            socketWriter.write(socket, new SocketData("+usr", null, personaUtils.getCoachPersonaInfo(socket, clientWrapper, room)));
+                            if (!clientWrapper.getSocket().equals(socket)) {
+                                socketWriter.write(clientWrapper.getSocket(), new SocketData("+usr", null, personaUtils.getCoachPersonaInfo(clientWrapper.getSocket(), socketWrapper, room)));
+                                socketWriter.write(clientWrapper.getSocket(), new SocketData("+who", null, personaUtils.getPersonaInfo(clientWrapper.getSocket(), clientWrapper, room)));
+                            }
+                            socketWriter.write(socket, new SocketData("+who", null, personaUtils.getPersonaInfo(socket, socketWrapper, room)));
+                        } else {
+                            socketWriter.write(socket, new SocketData("+usr", null, personaUtils.getPersonaInfo(clientWrapper.getSocket(), clientWrapper, room)));
+                            socketWriter.write(socket, new SocketData("+who", null, personaUtils.getPersonaInfo(clientWrapper.getSocket(), clientWrapper, room)));
+                            // Also notify each client in the room about the new user
+                            if (!clientWrapper.getSocket().equals(socket)) {
+                                socketWriter.write(clientWrapper.getSocket(), new SocketData("+usr", null, personaUtils.getPersonaInfo(socket, socketWrapper, room)));
+                                socketWriter.write(clientWrapper.getSocket(), new SocketData("+who", null, personaUtils.getPersonaInfo(clientWrapper.getSocket(), clientWrapper, room)));
+                            }
+                            // Remember the player who he is... (FIFA on PS2 forget about his country otherwise)
+                            socketWriter.write(socket, new SocketData("+who", null, personaUtils.getPersonaInfo(socket, socketWrapper, room)));
                         }
-                        // Also notify each client in the room about the new user
-                        if (!clientWrapper.getSocket().equals(socket)) {
-                            socketWriter.write(clientWrapper.getSocket(), new SocketData("+usr", null, personaUtils.getPersonaInfo(clientWrapper.getSocket(), socketWrapper, room)));
-                            socketWriter.write(clientWrapper.getSocket(), new SocketData("+who", null, personaUtils.getPersonaInfo(clientWrapper.getSocket(), clientWrapper, room)));
-                        }
-                        // Remember the player who he is... (FIFA on PS2 forget about his country otherwise)
-                        socketWriter.write(socket, new SocketData("+who", null, personaUtils.getPersonaInfo(socket, socketWrapper, room)));
                     }
                 }
             }
@@ -422,9 +431,15 @@ public class RoomService {
                         if (roomPlayerWrapper.getPersonaEntity() != null) {
                             Room roomPlayerRoom = getRoomByPersonaId(roomPlayerWrapper.getPersonaEntity().getId());
                             if (roomPlayerRoom != null && roomPlayerRoom.getId().equals(roomId)) {
-                                socketWriter.write(playerWrapper.getSocket(),
-                                        new SocketData("+usr", null,
-                                                personaUtils.getPersonaInfo(playerWrapper.getSocket(), roomPlayerWrapper, room)));
+                                if (PC_COACH06.equals(vers)) {
+                                    socketWriter.write(playerWrapper.getSocket(),
+                                            new SocketData("+usr", null,
+                                                    personaUtils.getCoachPersonaInfo(playerWrapper.getSocket(), roomPlayerWrapper, room)));
+                                } else {
+                                    socketWriter.write(playerWrapper.getSocket(),
+                                            new SocketData("+usr", null,
+                                                    personaUtils.getPersonaInfo(roomPlayerWrapper.getSocket(), roomPlayerWrapper, room)));
+                                }
                             }
                         }
                     }

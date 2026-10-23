@@ -27,6 +27,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static eu.eahub.services.server.GameServerService.*;
+import static eu.eahub.utils.SocketUtils.getCoachValueFromSocket;
 import static eu.eahub.utils.SocketUtils.getValueFromSocket;
 
 @Slf4j
@@ -201,8 +202,9 @@ public class GameService {
      */
     public void gset(Socket socket, SocketData socketData, SocketWrapper socketWrapper) {
         PersonaConnectionEntity personaConnectionEntity = socketWrapper.getPersonaConnectionEntity();
-        if ("PC_COACH06".equals(personaConnectionEntity.getVers())
-                && getValueFromSocket(socketData.getInputMessage(), "KICK") == null) {
+        if (PC_COACH06.equals(personaConnectionEntity.getVers())
+                && getCoachValueFromSocket(socketData.getInputMessage(), "KICK") == null) {
+            // Kicks are handled the same way as other P2P games
             setCoachGameState(socket, socketData, socketWrapper);
             return;
         }
@@ -278,6 +280,47 @@ public class GameService {
         if (PSP_MOH07.equals(personaConnectionEntity.getVers())) {
             handleMapRotation(socketData, socketWrapper);
         }
+    }
+
+    /**
+     * Update the game state for NFL Head Coach
+     * A single gset can contain USERFLAGS, USERPARAMS, SYSFLAGS and PARAMS together,
+     * so they are all applied before broadcasting the game state once
+     *
+     * @param socket        The socket to write the response to
+     * @param socketData    The socket data
+     * @param socketWrapper The socket wrapper of current connection
+     */
+    private synchronized void setCoachGameState(Socket socket, SocketData socketData, SocketWrapper socketWrapper) {
+        PersonaConnectionEntity personaConnectionEntity = socketWrapper.getPersonaConnectionEntity();
+        String userflags = getCoachValueFromSocket(socketData.getInputMessage(), "USERFLAGS");
+        String userparams = getCoachValueFromSocket(socketData.getInputMessage(), "USERPARAMS");
+        String sysflags = getCoachValueFromSocket(socketData.getInputMessage(), "SYSFLAGS");
+        String params = getCoachValueFromSocket(socketData.getInputMessage(), "PARAMS");
+
+        if (userflags != null) {
+            socketWrapper.setUserflags(userflags);
+        }
+        if (userparams != null) {
+            socketWrapper.setUserparams(userparams);
+        }
+
+        GameEntity gameEntity = gameConnectionRepository.findByPersonaConnectionIdAndEndTimeIsNull(personaConnectionEntity.getId())
+                .map(GameConnectionEntity::getGame).orElse(null);
+        if (gameEntity != null) {
+            if (sysflags != null) {
+                gameEntity.setSysflags(sysflags);
+            }
+            if (params != null) {
+                gameEntity.setParams(params);
+            }
+            if (sysflags != null || params != null) {
+                gameRepository.save(gameEntity);
+            }
+            // Broadcast the game state to all players in the game
+            broadcastGameStateToPlayers(personaConnectionEntity);
+        }
+        socketWriter.write(socket, new SocketData("gset", null, gameEntity != null ? gameUtils.getGameInfo(gameEntity) : null));
     }
 
     /**
@@ -442,6 +485,9 @@ public class GameService {
         }
 
         String userparams = getValueFromSocket(socketData.getInputMessage(), "USERPARAMS");
+        if (PC_COACH06.equals(socketWrapper.getPersonaConnectionEntity().getVers())) {
+            userparams = getCoachValueFromSocket(socketData.getInputMessage(), "USERPARAMS");
+        }
         if (userparams != null) {
             synchronized (this) {
                 socketWrapper.setUserparams(userparams);
@@ -651,6 +697,11 @@ public class GameService {
         GameEntity gameEntity = socketMapper.toGameEntity(socketData.getInputMessage(), name);
 
         String userparams = getValueFromSocket(socketData.getInputMessage(), "USERPARAMS");
+        if (PC_COACH06.equals(name)) {
+            // NFL Head Coach values can contain 0x85 (USERPARAMS) or '=' (PARAMS), which are lost with getValueFromSocket
+            gameEntity.setParams(getCoachValueFromSocket(socketData.getInputMessage(), "PARAMS"));
+            userparams = getCoachValueFromSocket(socketData.getInputMessage(), "USERPARAMS");
+        }
         if (userparams != null) {
             synchronized (this) {
                 socketWrapper.setUserparams(userparams);
@@ -936,26 +987,6 @@ public class GameService {
                 socketWriter.write(socketWrapper.getSocket(), new SocketData("+mgm", null, mgmContent));
             }
         }
-    }
-
-    /** Apply the complete PC Coach update before broadcasting a single snapshot. */
-    private synchronized void setCoachGameState(Socket socket, SocketData data, SocketWrapper wrapper) {
-        String flags = getValueFromSocket(data.getInputMessage(), "USERFLAGS");
-        String userparams = getValueFromSocket(data.getInputMessage(), "USERPARAMS");
-        String sysflags = getValueFromSocket(data.getInputMessage(), "SYSFLAGS");
-        String params = getValueFromSocket(data.getInputMessage(), "PARAMS");
-        GameEntity game = gameConnectionRepository
-                .findByPersonaConnectionIdAndEndTimeIsNull(wrapper.getPersonaConnectionEntity().getId())
-                .map(GameConnectionEntity::getGame).orElse(null);
-        if (flags != null) wrapper.setUserflags(flags);
-        if (userparams != null) wrapper.setUserparams(userparams);
-        if (game != null) {
-            if (sysflags != null) game.setSysflags(sysflags);
-            if (params != null) game.setParams(params);
-            if (sysflags != null || params != null) gameRepository.save(game);
-            broadcastGameStateToPlayers(wrapper.getPersonaConnectionEntity());
-        }
-        socketWriter.write(socket, new SocketData("gset", null, game == null ? null : gameUtils.getGameInfo(game)));
     }
 
     /**

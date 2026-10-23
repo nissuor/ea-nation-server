@@ -86,9 +86,7 @@ public class PersonaUtils {
                 {"I", String.valueOf(accountEntity.getId())},
                 {"M", hostPrefix + accountEntity.getName()},
                 {"N", hostPrefix + personaEntity.getPers()},
-                // Coach's +usr handler copies U-marked records into its local persona.
-                // Other players must never carry this flag to the recipient.
-                {"F", "PC_COACH06".equals(vers) && !socket.equals(socketWrapper.getSocket()) ? "" : "U"},
+                {"F", "U"},
                 {"P", "80"},
                 {"S", stats},
                 {"X", auxText},
@@ -106,8 +104,8 @@ public class PersonaUtils {
                 {"CI", "0"},
                 {"CT", "0"},
                 // 0x800225E0
-                {"A", socketWrapper.getSocket().getInetAddress().getHostAddress()},
-                {"LA", socketWrapper.getSocket().getInetAddress().getHostAddress()},
+                {"A", socket.getInetAddress().getHostAddress()},
+                {"LA", socket.getInetAddress().getHostAddress()},
                 // 0x80021384
                 {"C", "4000,,7,1,1,,1,1,5553"},
                 {"RI", room != null ? String.valueOf(room.getId()) : "0"}, // Room identifier
@@ -118,6 +116,24 @@ public class PersonaUtils {
                 {"RM", "LVL.1"}, // Room name
                 {"RF", room != null ? room.getFlags() : "CK"}, // Room flags
         }).collect(Collectors.toMap(data -> data[0], data -> data[1]));
+    }
+
+    /**
+     * Get persona info for NFL Head Coach, as seen by the recipient
+     * The game copies every record with F=U into its own persona, so only the recipient's own record has it,
+     * otherwise both players can't agree on Ready. A and LA are always the address of the described player.
+     *
+     * @param socket        the socket of the recipient
+     * @param socketWrapper the socket wrapper of the described player
+     * @param room          the room
+     * @return the persona info
+     */
+    public Map<String, String> getCoachPersonaInfo(Socket socket, SocketWrapper socketWrapper, Room room) {
+        Map<String, String> personaInfo = getPersonaInfo(socketWrapper.getSocket(), socketWrapper, room);
+        if (!socket.equals(socketWrapper.getSocket())) {
+            personaInfo.put("F", "");
+        }
+        return personaInfo;
     }
 
     /**

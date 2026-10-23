@@ -6,13 +6,15 @@ import eu.eahub.dto.SocketWrapper;
 import eu.eahub.services.core.*;
 import eu.eahub.services.server.SocketManager;
 import eu.eahub.services.social.BuddyService;
-import eu.eahub.services.stats.StatsService;
 import eu.eahub.services.stats.CoachCareerService;
+import eu.eahub.services.stats.StatsService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.net.Socket;
+
+import static eu.eahub.services.server.GameServerService.PC_COACH06;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -40,14 +42,23 @@ public class SocketProcessor {
     public void process(Socket socket, SocketData socketData) {
         SocketWrapper socketWrapper = socketManager.getSocketWrapperBySocket(socket);
         BuddySocketWrapper buddySocketWrapper = socketManager.getBuddySocketWrapperBySocket(socket);
+
+        // NFL Head Coach career screens
         if (socketWrapper != null && socketWrapper.getPersonaConnectionEntity() != null
-                && "PC_COACH06".equals(socketWrapper.getPersonaConnectionEntity().getVers())) {
+                && PC_COACH06.equals(socketWrapper.getPersonaConnectionEntity().getVers())) {
             switch (socketData.getIdMessage()) {
-                case "slst": coachCareerService.slst(socket, socketData); return;
-                case "sviw": coachCareerService.sviw(socket, socketData); return;
-                case "sdta": coachCareerService.sdta(socket, socketData); return;
+                case ("slst"):
+                    coachCareerService.slst(socket, socketData);
+                    return;
+                case ("sviw"):
+                    coachCareerService.sviw(socket, socketData);
+                    return;
+                case ("sdta"):
+                    coachCareerService.sdta(socket, socketData);
+                    return;
             }
         }
+
         switch (socketData.getIdMessage()) {
             case ("~png"):
                 break;

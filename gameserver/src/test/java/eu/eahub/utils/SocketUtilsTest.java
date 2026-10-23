@@ -1,18 +1,39 @@
 package eu.eahub.utils;
 
 import org.junit.jupiter.api.Test;
-import static org.junit.jupiter.api.Assertions.*;
+
+import static eu.eahub.utils.SocketUtils.RETURN_CHAR;
+import static eu.eahub.utils.SocketUtils.getCoachValueFromSocket;
+import static eu.eahub.utils.SocketUtils.getValueFromSocket;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 class SocketUtilsTest {
-    @Test void preservesBinarySettingsAndEmbeddedEquals() {
-        String settings = "^\u0084\u0085\u00d4\u0080";
-        String packet = "USERFLAGS=1\r\nUSERPARAMS=" + settings + "\nPARAMS=a=b=c\0";
-        assertEquals(settings, SocketUtils.getValueFromSocket(packet, "USERPARAMS"));
-        assertEquals("a=b=c", SocketUtils.getValueFromSocket(packet, "PARAMS"));
-        assertEquals("1", SocketUtils.getValueFromSocket(packet, "USERFLAGS"));
+
+    private static final String USERPARAMS = "^\u0084\u0085Ô\u0080";
+    private static final String DATA = "USERFLAGS=1\r\nUSERPARAMS=" + USERPARAMS + "\nPARAMS=a=b=c\nNAME=\0";
+
+    @Test
+    void getValueFromSocketKeepsGenericParsing() {
+        assertEquals("\\R", RETURN_CHAR);
+        assertEquals("1", getValueFromSocket(DATA, "USERFLAGS"));
+        // \R splits on 0x85, '=' truncates the value and an empty value is null
+        assertEquals("^\u0084", getValueFromSocket(DATA, "USERPARAMS"));
+        assertEquals("a", getValueFromSocket(DATA, "PARAMS"));
+        assertNull(getValueFromSocket(DATA, "NAME"));
+        assertNull(getValueFromSocket(DATA, "SYSFLAGS"));
     }
-    @Test void distinguishesClearedFieldsFromMissingFields() {
-        assertEquals("", SocketUtils.getValueFromSocket("PARAMS=\0", "PARAMS"));
-        assertNull(SocketUtils.getValueFromSocket("USERFLAGS=1\0", "PARAMS"));
+
+    @Test
+    void getCoachValueFromSocketKeepsBinaryAndEmbeddedEquals() {
+        assertEquals("1", getCoachValueFromSocket(DATA, "USERFLAGS"));
+        assertEquals(USERPARAMS, getCoachValueFromSocket(DATA, "USERPARAMS"));
+        assertEquals("a=b=c", getCoachValueFromSocket(DATA, "PARAMS"));
+    }
+
+    @Test
+    void getCoachValueFromSocketSeparatesEmptyFromMissing() {
+        assertEquals("", getCoachValueFromSocket(DATA, "NAME"));
+        assertNull(getCoachValueFromSocket(DATA, "SYSFLAGS"));
     }
 }

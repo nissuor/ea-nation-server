@@ -14,9 +14,7 @@ public class SocketUtils {
     public static final String DATETIME_FORMAT = "yyyy.M.d-H:mm:ss";
     public static final String SPACE_CHAR = " ";
     public static final String TAB_CHAR = "\t";
-    // This is a byte protocol. ISO-8859-1 0x85 can occur inside encoded
-    // USERPARAMS and must not be interpreted as a Unicode line separator.
-    public static final String RETURN_CHAR = "\\r\\n|\\r|\\n";
+    public static final String RETURN_CHAR = "\\R";
     public static final String NEWLINE_CHAR = "\n";
 
     /**
@@ -50,7 +48,34 @@ public class SocketUtils {
 
     public static String getValueFromSocket(String data, String key, String splitter) {
         String result = null;
-        String[] entries = data.replaceFirst("\\x00+$", "").split(splitter);
+        String[] entries = data.split(splitter);
+        for (String entry : entries) {
+            String[] parts = entry.trim().split("=");
+            if (key.equals(parts[0])) {
+                if (parts.length > 1) {
+                    result = parts[1];
+                }
+                break;
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Get the value from a key in a NFL Head Coach socket data
+     * Unlike getValueFromSocket, lines are only split on CR/LF (\R also splits on 0x85, which can be part of USERPARAMS),
+     * the value can contain '=' (e.g. PARAMS), and an empty value returns "" instead of null
+     * E.g. : data = "key1=a=b\nkey2="
+     * getCoachValueFromSocket(data, "key1") returns "a=b"
+     * getCoachValueFromSocket(data, "key2") returns ""
+     *
+     * @param data the socket data
+     * @param key  the key to look for
+     * @return the value, or null if the key is missing
+     */
+    public static String getCoachValueFromSocket(String data, String key) {
+        String result = null;
+        String[] entries = data.replaceFirst("\\x00+$", "").split("\\r\\n|\\r|\\n");
         for (String entry : entries) {
             String[] parts = entry.split("=", 2);
             if (key.equals(parts[0].trim())) {

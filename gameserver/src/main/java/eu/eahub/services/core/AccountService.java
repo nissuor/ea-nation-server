@@ -26,6 +26,7 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static eu.eahub.services.server.GameServerService.PC_COACH06;
 import static eu.eahub.utils.SocketUtils.getValueFromSocket;
 
 @Slf4j
@@ -201,10 +202,13 @@ public class AccountService {
                 }
 
                 PersonaConnectionEntity personaConnectionEntity = new PersonaConnectionEntity();
-                // This is also the socket lookup/cleanup key. Rewriting loopback
-                // to the machine's LAN address makes live sessions look absent.
-                personaConnectionEntity.setAddress(socketWrapper.getIdentifier());
                 String gameName = gameServerService.getNameByPort(socket.getLocalPort());
+                if (PC_COACH06.equals(gameName)) {
+                    // The address is also the key to find and clean up the socket, so keep the exact identifier (no localhost replacement)
+                    personaConnectionEntity.setAddress(socketWrapper.getIdentifier());
+                } else {
+                    personaConnectionEntity.setAddress(SocketUtils.handleLocalhostIp(socket.getRemoteSocketAddress().toString()));
+                }
                 personaConnectionEntity.setVers(gameName);
                 log.info("Login: user={}, VERS={}, SLUS={}, game={}, port={}", accountEntity.getName(), vers, slus, gameName, socket.getLocalPort());
                 synchronized (this) {
