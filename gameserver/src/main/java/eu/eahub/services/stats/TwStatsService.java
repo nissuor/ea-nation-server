@@ -59,8 +59,9 @@ public class TwStatsService {
     private final GameRepository gameRepository;
     private final PersonaRepository personaRepository;
 
-    // The statistic each of the game's 32 built-in ranked lists sorts by (its list table at 0x003027C0). 13 and 14 are the
-    // Match and Stroke Play boards; 33 to 35 are text lists
+    // The statistic each of the game's 32 built-in ranked lists sorts by (its list table at 0x003027C0). 0 is the overall
+    // board, which the STATISTICS screen opens for rank points; 13 and 14 are the Match and Stroke Play boards; 33 to 35 are
+    // text lists
     private static final int[] LIST_FIELDS = {0, 41, 43, 44, 37, 34, 33, 42, 46, 30, 31, 45, 32, 4, 5, 10, 11, 12, 7, 8, 9, 13, 14, 26,
             27, 15, 16, 19, 20, 39, 40, 50};
     // Statistics the game ranks lowest first: it draws 2^width - P for them

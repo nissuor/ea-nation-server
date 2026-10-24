@@ -503,6 +503,10 @@ class TwLobbyTest {
         assertEquals("2", frames.getLast().fields().get("R"));
         send(alice, "snap", "INDEX=13 CHAN=99");
         assertEquals("snapdata", frames.getLast().verb());
+        // List 0 is the overall board, which the STATISTICS screen opens for rank points
+        frames.clear();
+        send(alice, "snap", "INDEX=0 CHAN=4 START=0 RANGE=25");
+        assertEquals(List.of("Alice", "Bob"), received(alice, "+snp").stream().map(f -> f.fields().get("N")).toList());
         // List 18 ranks match wins alone
         frames.clear();
         send(alice, "snap", "INDEX=18 CHAN=4 START=0 RANGE=25");
