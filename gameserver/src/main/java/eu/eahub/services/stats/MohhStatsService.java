@@ -392,11 +392,18 @@ public class MohhStatsService {
     /**
      * Send ranking results.
      *
-     * @param socketData The socket data
+     * @param socketData    The socket data
+     * @param socketWrapper The socket wrapper of current connection
      */
     @Transactional
-    public void rank(SocketData socketData) {
+    public void rank(SocketData socketData, SocketWrapper socketWrapper) {
         String playerName = getValueFromSocket(socketData.getInputMessage(), "REPT", TAB_CHAR);
+        if (socketWrapper.getPersonaEntity() == null) {
+            return;
+        }
+        if (!socketWrapper.getPersonaEntity().getPers().equals(playerName)) {
+            return;
+        }
         String startTime = getValueFromSocket(socketData.getInputMessage(), "WHEN", TAB_CHAR);
 
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern(DATETIME_FORMAT);
