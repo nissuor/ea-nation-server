@@ -164,6 +164,13 @@ public class GameService {
     public void gsta(Socket socket, SocketData socketData, SocketWrapper socketWrapper) {
         socketWriter.write(socket, socketData);
 
+        Optional<GameConnectionEntity> gameConnectionEntityOpt = gameConnectionRepository.findByPersonaConnectionIdAndEndTimeIsNull(
+                        socketWrapper.getPersonaConnectionEntity().getId())
+                .filter(GameConnectionEntity::isHost);
+        if (gameConnectionEntityOpt.isEmpty()) {
+            return;
+        }
+
         // If game is P2P then we send +ses to all players in the lobby
         if (gameServerService.isP2P(socketWrapper.getPersonaConnectionEntity().getVers())) {
             GameConnectionEntity gameConnectionEntity = gameConnectionRepository.findByPersonaConnectionIdAndEndTimeIsNull(
@@ -226,6 +233,21 @@ public class GameService {
                 // Broadcast the userparams to all players in the game
                 broadcastGameStateToPlayers(personaConnectionEntity);
             }
+            if (sysflags != null || params != null || kick != null) {
+                Optional<GameConnectionEntity> gameConnectionEntityOpt = gameConnectionRepository.findByPersonaConnectionIdAndEndTimeIsNull(personaConnectionEntity.getId())
+                        .filter(GameConnectionEntity::isHost);
+                if (gameConnectionEntityOpt.isEmpty()) {
+                    socketWriter.write(socket, socketData);
+                    return;
+                }
+            }
+            if (sysflags != null) {
+                try {
+                    Integer.parseInt(sysflags);
+                } catch (NumberFormatException e) {
+                    sysflags = null; // Invalid sysflags format
+                }
+            }
             if (sysflags != null) {
                 // Update sysflags in the game entity
                 GameEntity gameEntity = gameConnectionRepository.findByPersonaConnectionIdAndEndTimeIsNull(personaConnectionEntity.getId())
@@ -255,8 +277,15 @@ public class GameService {
                 GameEntity gameEntity = gameConnectionRepository.findByPersonaConnectionIdAndEndTimeIsNull(personaConnectionEntity.getId())
                         .map(GameConnectionEntity::getGame).orElse(null);
                 if (gameEntity != null) {
+                    List<GameConnectionEntity> gameConnections = gameConnectionRepository.findByGameIdAndEndTimeIsNull(gameEntity.getId());
                     for (SocketWrapper clientWrapper : socketManager.getSocketWrapperByVers(personaConnectionEntity.getVers())) {
-                        if (kick.equals(clientWrapper.getPersonaEntity().getPers())) {
+                        if (clientWrapper.getPersonaEntity() != null && clientWrapper.getPersonaConnectionEntity() != null && kick.equals(clientWrapper.getPersonaEntity().getPers())) {
+                            Optional<GameConnectionEntity> gameConnectionEntityOpt = gameConnections.stream()
+                                    .filter(connection -> connection.getPersonaConnection().getId().equals(clientWrapper.getPersonaConnectionEntity().getId()))
+                                    .findFirst();
+                            if (gameConnectionEntityOpt.isEmpty()) {
+                                continue;
+                            }
                             Map<String, String> content = Collections.singletonMap("GAME", gameEntity.getId().toString());
                             socketWriter.write(clientWrapper.getSocket(), new SocketData("+kik", null, content));
                             endGameConnection(clientWrapper);
@@ -305,12 +334,21 @@ public class GameService {
                     gameEntity.setEndTime(now);
                     gameRepository.save(gameEntity);
 
+                    String newSysflags = sysflags;
+                    if (newSysflags != null) {
+                        try {
+                            Integer.parseInt(newSysflags);
+                        } catch (NumberFormatException e) {
+                            newSysflags = gameEntity.getSysflags(); // Invalid sysflags format
+                        }
+                    }
+
                     GameEntity newGameEntity = new GameEntity();
                     newGameEntity.setOriginalId(Optional.ofNullable(gameEntity.getOriginalId()).orElse(gameEntity.getId()));
                     newGameEntity.setVers(gameEntity.getVers());
                     newGameEntity.setName(gameEntity.getName());
                     newGameEntity.setParams(params);
-                    newGameEntity.setSysflags(sysflags);
+                    newGameEntity.setSysflags(newSysflags);
                     newGameEntity.setStartTime(now);
                     newGameEntity.setPass(gameEntity.getPass());
                     newGameEntity.setMinsize(gameEntity.getMinsize());
@@ -462,7 +500,7 @@ public class GameService {
 
     public void joinGame(Socket socket, SocketData socketData, SocketWrapper socketWrapper, GameEntity gameEntity) {
         String pass = getValueFromSocket(socketData.getInputMessage(), "PASS");
-        if (StringUtils.isNotEmpty(pass) && !pass.equals(gameEntity.getPass())) {
+        if (StringUtils.isNotEmpty(gameEntity.getPass()) && !gameEntity.getPass().equals(pass)) {
             socketWriter.write(socket, new SocketData("gjoipass", null, null)); // Wrong password
             return;
         }
@@ -645,6 +683,17 @@ public class GameService {
         String name = socketWrapper.getPersonaConnectionEntity().getVers();
         GameEntity gameEntity = socketMapper.toGameEntity(socketData.getInputMessage(), name);
 
+        if (gameEntity.getSysflags() == null) {
+            gameEntity.setSysflags("0");
+        } else {
+            try {
+                Integer.parseInt(gameEntity.getSysflags());
+            } catch (NumberFormatException e) {
+                socketWriter.write(socket, socketData); // Invalid sysflags format
+                return;
+            }
+        }
+
         String userparams = getValueFromSocket(socketData.getInputMessage(), "USERPARAMS");
         if (userparams != null) {
             synchronized (this) {
@@ -731,15 +780,19 @@ public class GameService {
      * If STATUS is "A", then the GPS is available to host a game.
      * If STATUS is "G", then the GPS is hosting a game.
      *
-     * @param socket     The socket to write the response to
-     * @param socketData The socket data
+     * @param socket        The socket to write the response to
+     * @param socketData    The socket data
+     * @param socketWrapper The socket wrapper of current connection
      */
-    public void gpss(Socket socket, SocketData socketData) {
+    public void gpss(Socket socket, SocketData socketData, SocketWrapper socketWrapper) {
         socketWriter.write(socket, socketData);
+
+        if (socketWrapper == null || socketWrapper.getPersonaConnectionEntity() == null) {
+            return;
+        }
 
         String status = getValueFromSocket(socketData.getInputMessage(), "STATUS");
 
-        SocketWrapper socketWrapper = socketManager.getSocketWrapperBySocket(socket);
         // Add a flag to indicate that the game is hosted
         if (("A").equals(status)) {
             socketWrapper.getIsGps().set(true);
@@ -774,6 +827,14 @@ public class GameService {
      */
     public void gdel(Socket socket, SocketData socketData, SocketWrapper socketWrapper) {
         socketWriter.write(socket, socketData);
+
+        Optional<GameConnectionEntity> gameConnectionEntityOpt = gameConnectionRepository.findByPersonaConnectionIdAndEndTimeIsNull(
+                        socketWrapper.getPersonaConnectionEntity().getId())
+                .filter(GameConnectionEntity::isHost);
+        if (gameConnectionEntityOpt.isEmpty()) {
+            return;
+        }
+
         endGame(socketWrapper);
     }
 
