@@ -81,7 +81,7 @@ public class SocketWriter {
                         props.isTcpDebugEnabled() ? "\n" + HexUtils.formatHexDump(bufferBytes) : playerInfo);
             }
 
-            synchronized (this) {
+            synchronized (socket) {
                 socket.getOutputStream().write(bufferBytes);
             }
 
