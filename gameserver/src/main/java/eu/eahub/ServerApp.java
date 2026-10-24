@@ -113,6 +113,8 @@ public class ServerApp implements CommandLineRunner {
             try {
                 while (true) {
                     Socket socket = serverSocket.accept();
+                    // Read timeout: 120s is safely above the 20s ~png cadence in TcpSocketThread, so a client answering pings is not cut off
+                    socket.setSoTimeout(120_000);
                     if (!(socket instanceof SSLSocket)) {
                         if (isAries) {
                             socketManager.addSocket(socket.getRemoteSocketAddress().toString(), socket);
