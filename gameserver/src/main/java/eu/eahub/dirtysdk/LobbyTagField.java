@@ -88,6 +88,8 @@ public class LobbyTagField {
     /**
      * Decode tag fields (based on TagFieldGetString), keeping their order
      * Fields are separated by whitespace, values can be "quoted" and use %xx escapes
+     * A body with tabs separates its fields with tabs (and newlines) only: TW04's match report is sent that way, with
+     * unquoted spaces in WHEN
      *
      * @param body the tag fields, may be null
      * @return the decoded fields
@@ -96,6 +98,7 @@ public class LobbyTagField {
         Map<String, String> result = new LinkedHashMap<>();
         StringBuilder token = new StringBuilder();
         boolean quoted = false;
+        boolean tabbed = body != null && body.indexOf('\t') >= 0;
         for (char c : (body == null ? "" : body).toCharArray()) {
             if (c == 0) {
                 break;
@@ -104,7 +107,8 @@ public class LobbyTagField {
                 quoted = !quoted;
                 continue;
             }
-            if (Character.isWhitespace(c) && !quoted) {
+            boolean separator = tabbed ? c == '\t' || c == '\n' || c == '\r' : Character.isWhitespace(c);
+            if (separator && !quoted) {
                 addField(result, token);
             } else {
                 token.append(c);

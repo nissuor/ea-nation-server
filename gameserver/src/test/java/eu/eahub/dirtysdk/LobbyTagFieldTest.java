@@ -31,6 +31,12 @@ class LobbyTagFieldTest {
     }
 
     @Test
+    void decodeTabSeparatedFieldsWithSpacesInValues() {
+        assertEquals(Map.of("WHEN", "2026.10.24 13:48:49", "REPT", "tw04test", "QUIT1", "1"),
+                LobbyTagField.decode("WHEN=2026.10.24 13:48:49\tREPT=tw04test\tQUIT1=1\0"));
+    }
+
+    @Test
     void encodeEscapesStringsAndKeepsBinaryFields() {
         assertEquals("TEXT=\"hello%3a %22golf%22%0a\"\n", LobbyTagField.encode(Map.of("TEXT", "hello: \"golf\"\n")));
         assertEquals("RNKRS=$00ff\n", LobbyTagField.encode(Map.of("RNKRS", "$00ff")));

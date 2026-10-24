@@ -56,6 +56,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import static eu.eahub.services.server.GameServerService.PS2_TW04;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -271,6 +272,7 @@ class TwLobbyTest {
 
     /**
      * A finished 18-hole result for the session that +ses started: the host wins 2 up, on 70 to the guest's 72
+     * Sent like the game sends it: tab-separated, with the space in WHEN unquoted
      */
     private String result(Map<String, String> session) {
         long epoch = Long.parseLong(session.get("WHEN").substring(1), 16);
@@ -284,7 +286,7 @@ class TwLobbyTest {
         }
         f.put("WHEN", LocalDateTime.ofEpochSecond(epoch, 0, ZoneOffset.UTC).format(DateTimeFormatter.ofPattern("yyyy.M.d H:mm:ss")));
         f.put("AUTH", session.get("AUTH"));
-        return LobbyTagField.encode(f).replace('\n', ' ');
+        return f.entrySet().stream().map(e -> e.getKey() + "=" + e.getValue()).collect(Collectors.joining("\t"));
     }
 
     private GameEntity game(Map<String, String> session) {
