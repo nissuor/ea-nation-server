@@ -1150,29 +1150,32 @@ public class GameService {
         String vers = socketWrapper.getPersonaConnectionEntity().getVers();
         SocketWrapper other = socketManager.getSocketWrapperByPersonaNameAndVers(fields.getOrDefault("PERS", ""), vers);
         Room room = roomService.getRoomByPersonaId(socketWrapper.getPersonaEntity().getId());
-        boolean sameRoom = other != null && other.getPersonaEntity() != null && room != null
-                && room == roomService.getRoomByPersonaId(other.getPersonaEntity().getId());
-        TwChallengeService.Ready ready = twChallengeService.ready(socketWrapper, other, fields.get("HOST"), sameRoom);
+        Room otherRoom = other == null || other.getPersonaEntity() == null ? null : roomService.getRoomByPersonaId(other.getPersonaEntity().getId());
+        TwChallengeService.Ready ready = twChallengeService.ready(socketWrapper, other, fields.get("HOST"), room, otherRoom);
         if (!ready.error().isEmpty()) {
             socketWriter.writeText(socket, "chal" + ready.error(), "");
             return;
         }
         socketWriter.writeTagFields(socket, "chal", Map.of("MODE", "play"));
         if (ready.start() != null) {
-            startTwSession(ready.start(), room);
+            startTwSession(ready.start(), ready.start().getRoomId() == null ? null : room);
         }
     }
 
     /**
      * Start a TW04 head-to-head session: a started game with both players' connections, then +ses to each
      * WHEN identifies the game when it is reported, AUTH checks the report
+     * The game is named after its room, like the room a match is played in, or after its mode when challenged from
+     * Messenger. PARAMS holds the course, the seed and the setup's MFLG
      */
     private void startTwSession(TwChallengeService.Challenge challenge, Room room) {
         SocketWrapper host = challenge.getHost();
         SocketWrapper guest = challenge.getGuest();
         int seed = ThreadLocalRandom.current().nextInt(1, Integer.MAX_VALUE);
-        String params = (challenge.getCourse() == null ? "" : challenge.getCourse()) + "," + seed;
-        GameEntity game = startSession(host.getPersonaConnectionEntity().getVers(), room, room.getName(), params, host, guest);
+        String params = (challenge.getCourse() == null ? "" : challenge.getCourse()) + "," + seed
+                + (challenge.getModeFlags() == null ? "" : "," + challenge.getModeFlags());
+        String name = room != null ? room.getName() : (Boolean.FALSE.equals(challenge.matchPlay()) ? "Stroke" : "Match") + ".B.Buddy";
+        GameEntity game = startSession(host.getPersonaConnectionEntity().getVers(), room, name, params, host, guest);
         Map<Long, String> addresses;
         try {
             addresses = new HashMap<>();
@@ -1195,7 +1198,7 @@ public class GameService {
         for (SocketWrapper player : List.of(host, guest)) {
             SocketWrapper other = player == host ? guest : host;
             Map<String, String> fields = new LinkedHashMap<>();
-            fields.put("NAME", room.getName());
+            fields.put("NAME", name);
             fields.put("SELF", player.getPersonaEntity().getPers());
             fields.put("HOST", host.getPersonaEntity().getPers());
             fields.put("OPPO", other.getPersonaEntity().getPers());

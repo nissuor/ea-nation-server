@@ -20,6 +20,7 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * Tiger Woods head-to-head challenges, negotiated in private messages before a session starts
  * The challenger hosts: challenge, then accept from the opponent, then chal (ready) from both
+ * A challenge is made in a room, or from Messenger to a player anywhere in the lobby; the setup's MFLG then gives the mode
  */
 @Slf4j
 @RequiredArgsConstructor
@@ -27,6 +28,10 @@ import java.util.concurrent.ConcurrentHashMap;
 public class TwChallengeService implements ConnectionListener {
 
     public static final int ATTR_PRIVATE = 0x10000;
+    // MFLG, the setup's mode word: 1 Match Play, 2 Stroke Play, and the RANKED GAME setting
+    private static final int MODE_MATCH = 1;
+    private static final int MODE_STROKE = 2;
+    public static final int MODE_RANKED = 0x20;
     private static final long PENDING_NANOS = 120_000_000_000L;
     private static final Set<String> REPLIES = Set.of("decline", "revoke", "busy", "ignore", "ignoreall");
 
@@ -47,6 +52,7 @@ public class TwChallengeService implements ConnectionListener {
         private boolean guestReady;
         private boolean started;
         private Integer course;
+        private Integer modeFlags;
         private Long gameId;
 
         Challenge(SocketWrapper host, SocketWrapper guest, Long roomId) {
@@ -58,6 +64,21 @@ public class TwChallengeService implements ConnectionListener {
         public SocketWrapper opponent(SocketWrapper wrapper) {
             return wrapper == host ? guest : host;
         }
+
+        /**
+         * Whether the setup says Match Play, or null if it does not say
+         */
+        public Boolean matchPlay() {
+            int mode = modeFlags == null ? 0 : modeFlags & (MODE_MATCH | MODE_STROKE);
+            return mode == MODE_MATCH ? Boolean.TRUE : mode == MODE_STROKE ? Boolean.FALSE : null;
+        }
+
+        /**
+         * Whether the result counts on the statistics: RANKED GAME on, or a setup without MFLG
+         */
+        public boolean ranked() {
+            return modeFlags == null || (modeFlags & MODE_RANKED) != 0;
+        }
     }
 
     /**
@@ -67,19 +88,20 @@ public class TwChallengeService implements ConnectionListener {
      *
      * @param socket      the sender's socket
      * @param sender      the sender
-     * @param senderRoom  the sender's room
+     * @param senderRoom  the sender's room, or null
      * @param other       the opponent, or null if not online
-     * @param otherRoom   the opponent's room
+     * @param otherRoom   the opponent's room, or null
      * @param blocked     whether the opponent ignores the sender
      * @param text        the message text: the action, then the match setup as key=value lines
      * @param flags       the message attributes
      */
     public synchronized void message(Socket socket, SocketWrapper sender, Room senderRoom, SocketWrapper other, Room otherRoom,
                                      boolean blocked, String text, int flags) {
-        if (other == null || other == sender || senderRoom == null || otherRoom != senderRoom || blocked) {
+        if (other == null || other == sender || blocked) {
             fail(socket, "mesg", "nrom");
             return;
         }
+        boolean sameRoom = senderRoom != null && otherRoom == senderRoom;
         String action = text.split("\n", 2)[0];
         if ("challenge".equals(action)) {
             for (SocketWrapper player : List.of(sender, other)) {
@@ -92,18 +114,26 @@ public class TwChallengeService implements ConnectionListener {
                 fail(socket, "mesg", "ingm");
                 return;
             }
-            Challenge challenge = new Challenge(sender, other, senderRoom.getId());
-            // The setup rides on the challenge as key=value lines; only it names the course
+            Challenge challenge = new Challenge(sender, other, sameRoom ? senderRoom.getId() : null);
+            // The setup rides on the challenge as key=value lines; only it names the course and the mode
             for (String line : text.split("\n")) {
                 if (line.startsWith("COUR=") && line.substring(5).strip().matches("[0-9]{1,3}")) {
                     challenge.setCourse(Integer.parseInt(line.substring(5).strip()));
+                } else if (line.startsWith("MFLG=") && line.substring(5).strip().matches("[0-9]{1,9}")) {
+                    challenge.setModeFlags(Integer.parseInt(line.substring(5).strip()));
                 }
+            }
+            // Outside a room, only the setup tells Match from Stroke Play
+            if (!sameRoom && challenge.matchPlay() == null) {
+                fail(socket, "mesg", "nrom");
+                return;
             }
             challenges.put(personaId(sender), challenge);
             challenges.put(personaId(other), challenge);
         } else {
             Challenge challenge = challenges.get(personaId(sender));
-            if (challenge == null || challenge.opponent(sender) != other || challenge.isStarted()) {
+            if (challenge == null || challenge.opponent(sender) != other || challenge.isStarted()
+                    || (challenge.getRoomId() != null && !sameRoom)) {
                 fail(socket, "mesg", "nrom");
                 return;
             }
@@ -130,15 +160,19 @@ public class TwChallengeService implements ConnectionListener {
     /**
      * Mark a player ready (chal HOST=0/1)
      *
-     * @param wrapper the player
-     * @param other   the opponent named in PERS, or null
-     * @param host    the HOST value sent
-     * @param sameRoom whether both players are in the same room
+     * @param wrapper   the player
+     * @param other     the opponent named in PERS, or null
+     * @param host      the HOST value sent
+     * @param room      the player's room, or null
+     * @param otherRoom the opponent's room, or null
      * @return the challenge if both players are now ready, the error code otherwise ("" when only this player is ready)
      */
-    public synchronized Ready ready(SocketWrapper wrapper, SocketWrapper other, String host, boolean sameRoom) {
+    public synchronized Ready ready(SocketWrapper wrapper, SocketWrapper other, String host, Room room, Room otherRoom) {
         Challenge challenge = wrapper.getPersonaEntity() == null ? null : challenges.get(personaId(wrapper));
-        if (challenge == null || other == null || challenge.opponent(wrapper) != other || challenges.get(personaId(other)) != challenge || !sameRoom) {
+        // A challenge made in a room holds while both players stay in it
+        boolean inPlace = challenge != null && (challenge.getRoomId() == null
+                || (room != null && room == otherRoom && challenge.getRoomId().equals(room.getId())));
+        if (challenge == null || other == null || challenge.opponent(wrapper) != other || challenges.get(personaId(other)) != challenge || !inPlace) {
             return new Ready(null, "nrom");
         }
         if (!challenge.isAccepted() || !(wrapper == challenge.getHost() ? "1" : "0").equals(host)) {

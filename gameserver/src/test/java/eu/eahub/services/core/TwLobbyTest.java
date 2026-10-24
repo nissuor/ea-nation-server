@@ -613,6 +613,56 @@ class TwLobbyTest {
     }
 
     @Test
+    void messengerChallengeOutsideARoomTakesItsModeFromTheSetup() throws Exception {
+        SocketWrapper[] pair = pair();
+        SocketWrapper a = pair[0];
+        SocketWrapper b = pair[1];
+        send(a, "move", "");
+        send(b, "move", "NAME=Match.T.East");
+        // Outside a shared room only MFLG tells Match from Stroke Play
+        send(a, "mesg", "PRIV=Bob ATTR=3 TEXT=challenge%0aCOUR%3d5");
+        assertEquals(1, received(a, "mesgnrom").size());
+        send(a, "mesg", "PRIV=Bob ATTR=3 TEXT=challenge%0aCOUR%3d5%0aMFLG%3d34");
+        send(b, "mesg", "PRIV=Alice ATTR=3 TEXT=accept");
+        send(a, "chal", "PERS=Bob HOST=1");
+        send(b, "chal", "PERS=Alice HOST=0");
+        Map<String, String> session = received(a, "+ses").getFirst().fields();
+        assertEquals("Stroke.B.Buddy", session.get("NAME"));
+        assertEquals(session.get("AUTH"), received(b, "+ses").getFirst().fields().get("AUTH"));
+        GameEntity game = game(session);
+        assertEquals("Stroke.B.Buddy", game.getName());
+        assertNull(game.getRoomId());
+        assertEquals("5," + session.get("SEED") + ",34", game.getParams());
+        send(a, "rank", result(session));
+        assertEquals("SUCCESS", received(a, "rank").getLast().fields().get("TITLE"));
+        // A ranked Stroke Play win
+        frames.clear();
+        send(a, "snap", "INDEX=15 CHAN=4 START=0 RANGE=25");
+        assertEquals("1", frames.getFirst().fields().get("COUNT"));
+        assertEquals("Alice", frames.getLast().fields().get("N"));
+    }
+
+    @Test
+    void unrankedMatchIsRecordedButNotCounted() throws Exception {
+        SocketWrapper[] pair = pair();
+        SocketWrapper a = pair[0];
+        SocketWrapper b = pair[1];
+        send(a, "mesg", "PRIV=Bob ATTR=3 TEXT=challenge%0aCOUR%3d4%0aMFLG%3d1");
+        send(b, "mesg", "PRIV=Alice ATTR=3 TEXT=accept");
+        send(a, "chal", "PERS=Bob HOST=1");
+        send(b, "chal", "PERS=Alice HOST=0");
+        Map<String, String> session = received(a, "+ses").getFirst().fields();
+        send(a, "rank", result(session));
+        assertEquals("SUCCESS", received(a, "rank").getLast().fields().get("TITLE"));
+        assertNotNull(gameRepository.findById(game(session).getId()).orElseThrow().getEndTime());
+        assertEquals(2, jdbc.queryForObject("SELECT COUNT(*) FROM stats.TW_GAME_REPORT", Integer.class));
+        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM stats.TW_PERSONA_STATS", Integer.class));
+        frames.clear();
+        send(a, "snap", "INDEX=0 CHAN=4 START=0 RANGE=25");
+        assertTrue(received(a, "+snp").isEmpty());
+    }
+
+    @Test
     void sharedRouterUsesTheReportedLanAddressButNeverThePcsx2VirtualAddress() throws Exception {
         SocketWrapper a = player(1, "203.0.113.1");
         SocketWrapper b = player(2, "203.0.113.1");

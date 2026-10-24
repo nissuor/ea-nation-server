@@ -76,12 +76,15 @@ public class TwStatsRebuild implements CommandLineRunner {
             if (!game.getId().equals(guest.getGameConnection().getGame().getId()) || host.getSide() != 0 || guest.getSide() != 1) {
                 continue;
             }
+            i++;
+            if (!TwStatsService.isRanked(game)) {
+                continue;
+            }
             TwStatsService.applyMatch(TwStatsService.isMatchPlay(game), List.of(TwStatsService.card(host), TwStatsService.card(guest)),
                     new TwPersonaStatsEntity[]{
                             stats(stats, host.getGameConnection().getPersonaConnection().getPersona(), vers),
                             stats(stats, guest.getGameConnection().getPersonaConnection().getPersona(), vers)});
             matches++;
-            i++;
         }
 
         // Tournament rounds: golf from each counted card, and each event (or weekend series) entered once

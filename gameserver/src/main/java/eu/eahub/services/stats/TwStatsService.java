@@ -12,6 +12,7 @@ import eu.eahub.repositories.core.GameRepository;
 import eu.eahub.repositories.core.PersonaRepository;
 import eu.eahub.repositories.stats.TwGameReportRepository;
 import eu.eahub.repositories.stats.TwPersonaStatsRepository;
+import eu.eahub.services.core.TwChallengeService;
 import eu.eahub.utils.TwCardUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -122,6 +123,9 @@ public class TwStatsService {
             setCard(report, card);
             twGameReportRepository.save(report);
         }
+        if (!isRanked(game)) {
+            return new Result(Receipt.SAVED, game);
+        }
         TwPersonaStatsEntity[] stats = new TwPersonaStatsEntity[2];
         for (int side = 0; side < 2; side++) {
             stats[side] = getOrCreateStats(sides[side].getPersonaConnection().getPersona(), game.getVers());
@@ -157,6 +161,19 @@ public class TwStatsService {
 
     public static boolean isMatchPlay(GameEntity game) {
         return game.getName() != null && game.getName().startsWith("Match.");
+    }
+
+    /**
+     * Whether a match counts on the statistics: RANKED GAME was on in its setup (MFLG, the third of its PARAMS)
+     * Matches started before MFLG was kept are ranked
+     */
+    public static boolean isRanked(GameEntity game) {
+        String[] params = game.getParams() == null ? new String[0] : game.getParams().split(",");
+        try {
+            return params.length < 3 || (Integer.parseInt(params[2]) & TwChallengeService.MODE_RANKED) != 0;
+        } catch (NumberFormatException e) {
+            return true;
+        }
     }
 
     private static boolean valid(Map<String, String> fields) {
@@ -569,7 +586,7 @@ public class TwStatsService {
             games.computeIfAbsent(report.getGameConnection().getGame().getId(), id -> new ArrayList<>()).add(report);
         }
         for (List<TwGameReportEntity> reports : games.values()) {
-            if (reports.size() != 2) {
+            if (reports.size() != 2 || !isRanked(reports.getFirst().getGameConnection().getGame())) {
                 continue;
             }
             TwPersonaStatsEntity[] stats = new TwPersonaStatsEntity[2];
