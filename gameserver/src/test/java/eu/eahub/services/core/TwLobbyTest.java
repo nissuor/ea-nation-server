@@ -503,6 +503,12 @@ class TwLobbyTest {
         assertEquals("2", frames.getLast().fields().get("R"));
         send(alice, "snap", "INDEX=13 CHAN=99");
         assertEquals("snapdata", frames.getLast().verb());
+        // List 18 ranks match wins alone
+        frames.clear();
+        send(alice, "snap", "INDEX=18 CHAN=4 START=0 RANGE=25");
+        assertEquals("1", frames.getFirst().fields().get("COUNT"));
+        assertEquals(Map.of("N", "Alice", "R", "1", "P", "1"), Map.of("N", frames.getLast().fields().get("N"),
+                "R", frames.getLast().fields().get("R"), "P", frames.getLast().fields().get("P")));
     }
 
     @Test

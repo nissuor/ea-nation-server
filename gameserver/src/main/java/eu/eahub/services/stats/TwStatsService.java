@@ -32,6 +32,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.ToLongFunction;
 
 import static eu.eahub.dirtysdk.TwStatsCodec.Field;
 import static eu.eahub.services.server.GameServerService.ALL_TW;
@@ -57,6 +58,13 @@ public class TwStatsService {
     private final GameConnectionRepository gameConnectionRepository;
     private final GameRepository gameRepository;
     private final PersonaRepository personaRepository;
+
+    // The statistic each of the game's 32 built-in ranked lists sorts by (its list table at 0x003027C0). 13 and 14 are the
+    // Match and Stroke Play boards; 33 to 35 are text lists
+    private static final int[] LIST_FIELDS = {0, 41, 43, 44, 37, 34, 33, 42, 46, 30, 31, 45, 32, 4, 5, 10, 11, 12, 7, 8, 9, 13, 14, 26,
+            27, 15, 16, 19, 20, 39, 40, 50};
+    // Statistics the game ranks lowest first: it draws 2^width - P for them
+    private static final Set<Integer> LOWEST_FIRST = Set.of(39, 41, 43, 44);
 
     public enum Receipt {
         SAVED,
@@ -501,21 +509,31 @@ public class TwStatsService {
     }
 
     /**
+     * Whether a list is one of the game's leaderboards of a single statistic (e.g. 4 = longest drive, 18 = match wins)
+     *
+     * @param board the list index
+     * @return true for 1 to 31, except the Match and Stroke Play boards
+     */
+    public static boolean isStatList(int board) {
+        return board >= 1 && board < LIST_FIELDS.length && board != 13 && board != 14;
+    }
+
+    /**
      * Get a page of a head-to-head leaderboard
      *
      * @param vers  the game version
-     * @param board 0 = overall, 13 = Match Play, 14 = Stroke Play, 32 = last seven days
+     * @param board 0 = overall, 13 = Match Play, 14 = Stroke Play, 32 = last seven days, or a statistic's list (isStatList)
      * @param start the first row (from 0)
      * @param count the number of rows
      * @param find  a player name to show alone, or empty
      * @return the rows
      */
     public List<Standing> board(String vers, int board, int start, int count, String find) {
-        if (board == 32) {
-            List<Standing> week = week(vers);
+        if (board == 32 || isStatList(board)) {
+            List<Standing> rows = board == 32 ? week(vers) : statBoard(vers, board);
             return find.isEmpty()
-                    ? week.stream().skip(start).limit(count).toList()
-                    : week.stream().filter(row -> row.name().equalsIgnoreCase(find)).limit(count).toList();
+                    ? rows.stream().skip(start).limit(count).toList()
+                    : rows.stream().filter(row -> row.name().equalsIgnoreCase(find)).limit(count).toList();
         }
         if (!find.isEmpty()) {
             Optional<TwPersonaStatsEntity> found = personaRepository.findByPers(find)
@@ -563,8 +581,32 @@ public class TwStatsService {
             reports.forEach(report -> cards.add(card(report)));
             applyMatch(isMatchPlay(reports.getFirst().getGameConnection().getGame()), cards, stats);
         }
-        List<TwPersonaStatsEntity> sorted = new ArrayList<>(totals.values());
-        sorted.sort(Comparator.comparingLong((TwPersonaStatsEntity s) -> s.getMatchPoints() + s.getStrokePoints()).reversed()
+        return ranked(totals.values(), s -> s.getMatchPoints() + s.getStrokePoints());
+    }
+
+    /**
+     * A statistic's list: the players who have a value for it, best first
+     * The points are the value, or 2^width - value for a statistic ranked lowest first, which the game draws as the value
+     */
+    private List<Standing> statBoard(String vers, int board) {
+        int field = LIST_FIELDS[board];
+        long top = 1L << TwStatsCodec.width(field);
+        Map<TwPersonaStatsEntity, Long> points = new LinkedHashMap<>();
+        for (TwPersonaStatsEntity s : twPersonaStatsRepository.findByVers(vers)) {
+            long value = Math.min(values(s)[field], top - 1);
+            if (s.getPersona().getDeletedOn() == null && value > 0) {
+                points.put(s, LOWEST_FIRST.contains(field) ? top - value : value);
+            }
+        }
+        return ranked(points.keySet(), points::get);
+    }
+
+    /**
+     * Sort players by points, highest first, then by name; tied players share a rank
+     */
+    private static List<Standing> ranked(Collection<TwPersonaStatsEntity> stats, ToLongFunction<TwPersonaStatsEntity> points) {
+        List<TwPersonaStatsEntity> sorted = new ArrayList<>(stats);
+        sorted.sort(Comparator.comparingLong(points).reversed()
                 .thenComparing(s -> s.getPersona().getPers(), String.CASE_INSENSITIVE_ORDER)
                 .thenComparingLong(s -> s.getPersona().getId()));
         List<Standing> result = new ArrayList<>();
@@ -572,12 +614,12 @@ public class TwStatsService {
         int rank = 0;
         for (int i = 0; i < sorted.size(); i++) {
             TwPersonaStatsEntity s = sorted.get(i);
-            long points = s.getMatchPoints() + s.getStrokePoints();
-            if (points != previous) {
+            long value = points.applyAsLong(s);
+            if (value != previous) {
                 rank = i + 1;
             }
-            previous = points;
-            result.add(new Standing(s.getPersona().getId(), s.getPersona().getPers(), rank, points, values(s)));
+            previous = value;
+            result.add(new Standing(s.getPersona().getId(), s.getPersona().getPers(), rank, value, values(s)));
         }
         return result;
     }

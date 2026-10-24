@@ -4,6 +4,7 @@ import eu.eahub.dto.SocketWrapper;
 import eu.eahub.entities.core.GameConnectionEntity;
 import eu.eahub.entities.core.GameEntity;
 import eu.eahub.entities.core.PersonaConnectionEntity;
+import eu.eahub.entities.stats.TwPersonaStatsEntity;
 import eu.eahub.repositories.core.GameConnectionRepository;
 import eu.eahub.repositories.core.GameRepository;
 import eu.eahub.repositories.core.PersonaConnectionRepository;
@@ -42,6 +43,7 @@ import static eu.eahub.services.stats.TwStatsService.Receipt.INVALID;
 import static eu.eahub.services.stats.TwStatsService.Receipt.SAVED;
 import static eu.eahub.services.stats.TwStatsService.Receipt.UNAUTHORIZED;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @DataJpaTest
@@ -329,6 +331,40 @@ class TwStatsServiceTest {
         assertEquals(0, host.values()[45]);
         assertEquals(50, host.values()[42]); // 7 greens in 14 holes still count
         assertEquals(3, host.values()[31]);
+    }
+
+    private void golfer(long personaId, int longestDrive, Integer bestRound, int matchWins) {
+        TwPersonaStatsEntity s = stats.getOrCreateStats(personaRepository.findById(personaId).orElseThrow(), PS2_TW04);
+        s.setLongestDrive(longestDrive);
+        s.setBestRound(bestRound);
+        s.setRounds(bestRound == null ? 0 : 1);
+        s.setRoundStrokes(bestRound == null ? 0 : bestRound);
+        s.setMatchWins(matchWins);
+        twPersonaStatsRepository.save(s);
+    }
+
+    private static List<String> rows(List<TwStatsService.Standing> board) {
+        return board.stream().map(row -> row.rank() + " " + row.name() + " " + row.points()).toList();
+    }
+
+    @Test
+    void eachStatisticHasItsOwnListAndTheLowestFirstOnesAreSentAsTheGameDrawsThem() {
+        golfer(1, 310, 70, 2);
+        golfer(2, 345, 66, 0);
+        golfer(3, 310, null, 2);
+        // List 4 is the longest drive (field 37); a tie shares the rank
+        assertEquals(List.of("1 Guest 345", "2 Host 310", "2 Other 310"), rows(stats.board(PS2_TW04, 4, 0, 25, "")));
+        // List 29 is the best round (field 39, 8 bits, lowest first): 256 - strokes, and a player without a round is left out
+        assertEquals(List.of("1 Guest 190", "2 Host 186"), rows(stats.board(PS2_TW04, 29, 0, 25, "")));
+        // List 18 is match wins (field 7); players without one are left out
+        assertEquals(List.of("1 Host 2", "1 Other 2"), rows(stats.board(PS2_TW04, 18, 0, 25, "")));
+        assertEquals(List.of("1 Other 2"), rows(stats.board(PS2_TW04, 18, 0, 25, "oTHER")));
+        assertEquals(List.of("2 Other 310"), rows(stats.board(PS2_TW04, 4, 2, 25, "")));
+        // A list of a statistic nobody has, and the lists that are not statistics
+        assertEquals(List.of(), stats.board(PS2_TW04, 30, 0, 25, ""));
+        assertTrue(TwStatsService.isStatList(1) && TwStatsService.isStatList(31));
+        assertFalse(TwStatsService.isStatList(0) || TwStatsService.isStatList(13) || TwStatsService.isStatList(14)
+                || TwStatsService.isStatList(32) || TwStatsService.isStatList(33));
     }
 
     @Test

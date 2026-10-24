@@ -20,7 +20,6 @@ import org.springframework.stereotype.Service;
 import java.net.Socket;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -190,7 +189,8 @@ public class StatsService {
     }
 
     /**
-     * TW04 leaderboards: 13 = Match Play, 14 = Stroke Play, 32 = last seven days, the others are tournament boards
+     * TW04 leaderboards: 13 = Match Play, 14 = Stroke Play, 32 = last seven days, 1 to 31 one statistic each, the others are
+     * tournament boards
      * The snap acknowledgement arms the channel (4 or 5) before its +snp rows arrive
      */
     private void twSnap(Socket socket, SocketData socketData, SocketWrapper socketWrapper) {
@@ -212,7 +212,7 @@ public class StatsService {
         record Row(String name, int rank, long points, String body) {
         }
         List<Row> page;
-        if (Set.of(13, 14, 32).contains(index)) {
+        if (index == 13 || index == 14 || index == 32 || TwStatsService.isStatList(index)) {
             page = twStatsService.board(vers, index, start, count, find).stream()
                     .map(r -> new Row(r.name(), r.rank(), r.points(), r.packed()))
                     .toList();

@@ -37,6 +37,16 @@ public final class TwStatsCodec {
     }
 
     /**
+     * Get the width of a field
+     *
+     * @param field The field index
+     * @return The width in bits
+     */
+    public static int width(int field) {
+        return WIDTHS[field];
+    }
+
+    /**
      * Get the statistics of a persona that has not played yet
      *
      * @return The 56 default values
