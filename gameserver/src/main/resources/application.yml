@@ -59,6 +59,14 @@ game:
         enabled: false
       ports:
         - port: 5000 # Arbitrary buddy port
+    - name: 'PC_COACH06' # NFL Head Coach (PC)
+      enabled: false
+      sdk: '3.9.5.2'
+      ssl:
+        enabled: false # Tested with a client patched to disable SSL
+        domain: 'pccoach06.ea.com'
+      ports:
+        - port: 31320
     - name: 'PC_NFS06' # Need for Speed: Most Wanted (PC)
       sdk: '3.9.3.0'
       ssl:

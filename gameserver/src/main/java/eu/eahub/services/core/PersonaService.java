@@ -36,6 +36,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static eu.eahub.services.server.GameServerService.ALL_MOH;
+import static eu.eahub.services.server.GameServerService.PC_COACH06;
 import static eu.eahub.utils.HexUtils.formatHexString;
 import static eu.eahub.utils.SocketUtils.getValueFromSocket;
 
@@ -334,7 +335,11 @@ public class PersonaService {
      */
     public void usr(Socket socket, SocketWrapper socketWrapper) {
         Room room = roomService.getRoomByPersonaId(socketWrapper.getPersonaEntity().getId());
-        socketWriter.write(socket, new SocketData("+usr", null, personaUtils.getPersonaInfo(socket, socketWrapper, room)));
+        if (PC_COACH06.equals(socketWrapper.getPersonaConnectionEntity().getVers())) {
+            socketWriter.write(socket, new SocketData("+usr", null, personaUtils.getCoachPersonaInfo(socket, socketWrapper, room)));
+        } else {
+            socketWriter.write(socket, new SocketData("+usr", null, personaUtils.getPersonaInfo(socket, socketWrapper, room)));
+        }
     }
 
     /**
