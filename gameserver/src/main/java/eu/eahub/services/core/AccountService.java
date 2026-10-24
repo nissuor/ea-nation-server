@@ -1,5 +1,6 @@
 package eu.eahub.services.core;
 
+import eu.eahub.dirtysdk.LobbyTagField;
 import eu.eahub.dto.SocketData;
 import eu.eahub.dto.SocketWrapper;
 import eu.eahub.entities.core.AccountEntity;
@@ -8,6 +9,8 @@ import eu.eahub.entities.core.PersonaEntity;
 import eu.eahub.mappers.SocketMapper;
 import eu.eahub.repositories.core.AccountRepository;
 import eu.eahub.repositories.core.BlacklistRepository;
+import eu.eahub.repositories.core.PersonaRepository;
+import eu.eahub.repositories.stats.TwGolferRepository;
 import eu.eahub.services.server.GameServerService;
 import eu.eahub.steps.SocketWriter;
 import eu.eahub.utils.AccountUtils;
@@ -20,12 +23,14 @@ import org.springframework.stereotype.Service;
 
 import java.net.Socket;
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static eu.eahub.services.server.GameServerService.ALL_TW;
 import static eu.eahub.utils.SocketUtils.getValueFromSocket;
 
 @Slf4j
@@ -41,6 +46,8 @@ public class AccountService {
     private final GameServerService gameServerService;
     private final SocketWriter socketWriter;
     private final EmailUtils emailUtils;
+    private final PersonaRepository personaRepository;
+    private final TwGolferRepository twGolferRepository;
 
     /**
      * Account creation
@@ -87,11 +94,14 @@ public class AccountService {
 
     /**
      * Account update
+     * Only the account logged in on this connection can be updated, or another one given its current password
+     * The password changes when a new one (CHNG) is sent; some games, like TW04, send neither PASS nor CHNG
      *
-     * @param socket     The socket to write the response to
-     * @param socketData The socket data containing the input message
+     * @param socket        The socket to write the response to
+     * @param socketData    The socket data containing the input message
+     * @param socketWrapper The socket wrapper of current connection
      */
-    public void edit(Socket socket, SocketData socketData) {
+    public void edit(Socket socket, SocketData socketData, SocketWrapper socketWrapper) {
         String name = getValueFromSocket(socketData.getInputMessage(), "NAME");
 
         Optional<AccountEntity> accountEntityOpt = accountRepository.findByName(name);
@@ -102,6 +112,15 @@ public class AccountService {
             String mail = getValueFromSocket(socketData.getInputMessage(), "MAIL");
             String chng = getValueFromSocket(socketData.getInputMessage(), "CHNG");
 
+            boolean loggedIn = socketWrapper.getAccountEntity() != null && accountEntity.getId().equals(socketWrapper.getAccountEntity().getId());
+            boolean passMatches = pass != null && passwordUtils.bCryptMatches(pass, accountEntity.getPass());
+            boolean passChange = chng != null && !chng.equals(pass);
+            if (!(loggedIn || passMatches) || (passChange && !passMatches)) {
+                socketData.setIdMessage("editpass"); // Invalid password error (EC_INV_PASS)
+                socketWriter.write(socket, socketData);
+                return;
+            }
+
             List<AccountEntity> existingAccountsByMail = accountRepository.findByMail(mail);
             if (mail == null || existingAccountsByMail.size() > 1 || (existingAccountsByMail.size() == 1 && !existingAccountsByMail.getFirst().getId().equals(accountEntity.getId()))) {
                 socketData.setIdMessage("editmail"); // Duplicate email, but we can only send an "invalid email" error
@@ -111,14 +130,8 @@ public class AccountService {
                 accountEntity.setMail(mail);
             }
 
-            if (!pass.equals(chng)) {
-                if (passwordUtils.bCryptMatches(pass, accountEntity.getPass())) {
-                    accountEntity.setPass(passwordUtils.bCryptEncode(chng));
-                } else {
-                    socketData.setIdMessage("editpass"); // Invalid password error (EC_INV_PASS)
-                    socketWriter.write(socket, socketData);
-                    return;
-                }
+            if (passChange) {
+                accountEntity.setPass(passwordUtils.bCryptEncode(chng));
             }
             accountEntity.setUpdatedOn(LocalDateTime.now());
             accountRepository.save(accountEntity);
@@ -190,6 +203,8 @@ public class AccountService {
                         {"PERSONAS", personas},
                         {"LOC", accountEntity.getLoc() != null ? accountEntity.getLoc() : "enUS"},
                         {"MAIL", accountEntity.getMail() != null ? accountEntity.getMail() : ""},
+                        {"BORN", accountEntity.getBorn() != null ? accountEntity.getBorn() : ""},
+                        {"GEND", accountEntity.getGend() != null ? accountEntity.getGend() : ""},
                         {"SPAM", "NN"},
                         {"TOS", "1"},
                 }).collect(Collectors.toMap(data -> data[0], data -> data[1]));
@@ -264,6 +279,10 @@ public class AccountService {
     }
 
     public void user(Socket socket, SocketData socketData, SocketWrapper socketWrapper) {
+        if (socketWrapper.getPersonaConnectionEntity() != null && ALL_TW.contains(socketWrapper.getPersonaConnectionEntity().getVers())) {
+            twUser(socket, socketData, socketWrapper);
+            return;
+        }
 //        String pers = getValueFromSocket(socketData.getInputMessage(), "PERS");
 
         Map<String, String> content = Stream.of(new String[][]{
@@ -274,5 +293,24 @@ public class AccountService {
 
         socketData.setOutputData(content);
         socketWriter.write(socket, socketData);
+    }
+
+    /**
+     * TW04 asks for another player's created golfer (CRPIN), uploaded with cusr whomi
+     */
+    private void twUser(Socket socket, SocketData socketData, SocketWrapper socketWrapper) {
+        if (socketWrapper.getPersonaEntity() == null) {
+            socketWriter.writeText(socket, "usernusr", "");
+            return;
+        }
+        String vers = socketWrapper.getPersonaConnectionEntity().getVers();
+        String pers = LobbyTagField.decode(socketData.getInputMessage()).getOrDefault("PERS", "");
+        Map<String, String> content = new LinkedHashMap<>();
+        content.put("PERS", pers);
+        personaRepository.findByPers(pers)
+                .filter(persona -> persona.getDeletedOn() == null)
+                .flatMap(persona -> twGolferRepository.findByPersonaIdAndVers(persona.getId(), vers))
+                .ifPresent(golfer -> content.put("CRPIN", golfer.getData()));
+        socketWriter.writeTagFields(socket, socketData.getIdMessage(), content);
     }
 }
