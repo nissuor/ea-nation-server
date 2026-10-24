@@ -25,6 +25,8 @@ import java.util.concurrent.ConcurrentMap;
 @RequiredArgsConstructor
 public class TunnelHandler extends ChannelInboundHandlerAdapter {
 
+    static final int MAX_REQUEST_SIZE = 1024 * 1024;
+
     private final Props props;
     private final ConcurrentMap<String, TunnelRequestDTO> requestMap = new ConcurrentHashMap<>();
 
@@ -44,7 +46,13 @@ public class TunnelHandler extends ChannelInboundHandlerAdapter {
                 ByteBuf contentBuffer = content != null ? content.content() : null;
                 synchronized (requestData) {
                     if (contentBuffer != null) {
-                        requestData.getRequestBody().append(contentBuffer.toString(CharsetUtil.UTF_8));
+                        String chunk = contentBuffer.toString(CharsetUtil.UTF_8);
+                        if (requestData.getRequestBody().length() + chunk.length() > MAX_REQUEST_SIZE) {
+                            requestMap.remove(key);
+                            ctx.close();
+                            return;
+                        }
+                        requestData.getRequestBody().append(chunk);
                     }
                 }
                 if (msg instanceof LastHttpContent) {
