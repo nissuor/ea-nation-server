@@ -1,6 +1,7 @@
 package eu.eahub.services.stats;
 
 import eu.eahub.dto.SocketData;
+import eu.eahub.dto.SocketWrapper;
 import eu.eahub.entities.core.GameConnectionEntity;
 import eu.eahub.entities.stats.NfsGameReportEntity;
 import eu.eahub.entities.stats.NfsPersonaStatsEntity;
@@ -29,7 +30,10 @@ public class NfsRankService {
     private final GameConnectionRepository gameConnectionRepository;
 
     @Transactional
-    public void rank(SocketData socketData) {
+    public void rank(SocketData socketData, SocketWrapper socketWrapper) {
+        if (socketWrapper.getPersonaEntity() == null) {
+            return;
+        }
         // Extract common game info
         String startTime = getValueFromSocket(socketData.getInputMessage(), "WHEN", TAB_CHAR);
 
@@ -41,13 +45,28 @@ public class NfsRankService {
         // Default to 2 if not found (MW don't send NUMPLYRS but always has 2 players)
         int numPlayers = playerCountStr != null ? Integer.parseInt(playerCountStr) : 2;
 
+        Long gameId = null;
+        for (int i = 0; i < numPlayers; i++) {
+            String playerName = getValueFromSocket(socketData.getInputMessage(), "NAME" + i, TAB_CHAR);
+            if (socketWrapper.getPersonaEntity().getPers().equals(playerName)) {
+                List<GameConnectionEntity> gameConnections = gameConnectionRepository.findMatchingGameConnections(playerName, parsedStartTime, true);
+                if (!gameConnections.isEmpty()) {
+                    gameId = gameConnections.getFirst().getGame().getId();
+                }
+                break;
+            }
+        }
+        if (gameId == null) {
+            return;
+        }
+
         // Process each player individually
         for (int i = 0; i < numPlayers; i++) {
-            processPlayerRank(socketData, String.valueOf(i), parsedStartTime);
+            processPlayerRank(socketData, String.valueOf(i), parsedStartTime, gameId);
         }
     }
 
-    private void processPlayerRank(SocketData socketData, String playerIndex, LocalDateTime startTime) {
+    private void processPlayerRank(SocketData socketData, String playerIndex, LocalDateTime startTime, Long gameId) {
         // Get player name
         String playerName = getValueFromSocket(socketData.getInputMessage(), "NAME" + playerIndex, TAB_CHAR);
 
@@ -56,6 +75,9 @@ public class NfsRankService {
 
         if (!gameConnections.isEmpty()) {
             GameConnectionEntity gameConnection = gameConnections.getFirst();
+            if (!gameConnection.getGame().getId().equals(gameId)) {
+                return;
+            }
 
             // Check if report already exists for this game connection
             if (!nfsGameReportRepository.existsByGameConnectionId(gameConnection.getId())) {

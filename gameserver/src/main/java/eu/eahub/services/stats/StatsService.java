@@ -105,15 +105,15 @@ public class StatsService {
 
         String vers = socketWrapper.getPersonaConnectionEntity().getVers();
         if (PSP_MOH07.equals(vers)) {
-            mohhStatsService.rank(socketData);
+            mohhStatsService.rank(socketData, socketWrapper);
         } else {
             if (gameServerService.isP2P(vers)) {
                 if (ALL_NHL.contains(vers)) {
-                    nhlStatsService.rank(socketData);
+                    nhlStatsService.rank(socketData, socketWrapper);
                 } else if (ALL_PSP_NFS.contains(vers)) {
-                    nfsRankService.rank(socketData);
+                    nfsRankService.rank(socketData, socketWrapper);
                 } else if (ALL_FIFA.contains(vers)) {
-                    fifaStatsService.rank(socketData);
+                    fifaStatsService.rank(socketData, socketWrapper);
                 }
                 // Close the game and gameConnections if the game is P2P
                 gameService.endGame(socketWrapper);
