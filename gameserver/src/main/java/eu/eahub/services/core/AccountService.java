@@ -87,11 +87,14 @@ public class AccountService {
 
     /**
      * Account update
+     * Only the account logged in on this connection can be updated, or another one given its current password
+     * The password changes when a new one (CHNG) is sent; some games, like TW04, send neither PASS nor CHNG
      *
-     * @param socket     The socket to write the response to
-     * @param socketData The socket data containing the input message
+     * @param socket        The socket to write the response to
+     * @param socketData    The socket data containing the input message
+     * @param socketWrapper The socket wrapper of current connection
      */
-    public void edit(Socket socket, SocketData socketData) {
+    public void edit(Socket socket, SocketData socketData, SocketWrapper socketWrapper) {
         String name = getValueFromSocket(socketData.getInputMessage(), "NAME");
 
         Optional<AccountEntity> accountEntityOpt = accountRepository.findByName(name);
@@ -102,6 +105,15 @@ public class AccountService {
             String mail = getValueFromSocket(socketData.getInputMessage(), "MAIL");
             String chng = getValueFromSocket(socketData.getInputMessage(), "CHNG");
 
+            boolean loggedIn = socketWrapper.getAccountEntity() != null && accountEntity.getId().equals(socketWrapper.getAccountEntity().getId());
+            boolean passMatches = pass != null && passwordUtils.bCryptMatches(pass, accountEntity.getPass());
+            boolean passChange = chng != null && !chng.equals(pass);
+            if (!(loggedIn || passMatches) || (passChange && !passMatches)) {
+                socketData.setIdMessage("editpass"); // Invalid password error (EC_INV_PASS)
+                socketWriter.write(socket, socketData);
+                return;
+            }
+
             List<AccountEntity> existingAccountsByMail = accountRepository.findByMail(mail);
             if (mail == null || existingAccountsByMail.size() > 1 || (existingAccountsByMail.size() == 1 && !existingAccountsByMail.getFirst().getId().equals(accountEntity.getId()))) {
                 socketData.setIdMessage("editmail"); // Duplicate email, but we can only send an "invalid email" error
@@ -111,14 +123,8 @@ public class AccountService {
                 accountEntity.setMail(mail);
             }
 
-            if (!pass.equals(chng)) {
-                if (passwordUtils.bCryptMatches(pass, accountEntity.getPass())) {
-                    accountEntity.setPass(passwordUtils.bCryptEncode(chng));
-                } else {
-                    socketData.setIdMessage("editpass"); // Invalid password error (EC_INV_PASS)
-                    socketWriter.write(socket, socketData);
-                    return;
-                }
+            if (passChange) {
+                accountEntity.setPass(passwordUtils.bCryptEncode(chng));
             }
             accountEntity.setUpdatedOn(LocalDateTime.now());
             accountRepository.save(accountEntity);
@@ -190,6 +196,8 @@ public class AccountService {
                         {"PERSONAS", personas},
                         {"LOC", accountEntity.getLoc() != null ? accountEntity.getLoc() : "enUS"},
                         {"MAIL", accountEntity.getMail() != null ? accountEntity.getMail() : ""},
+                        {"BORN", accountEntity.getBorn() != null ? accountEntity.getBorn() : ""},
+                        {"GEND", accountEntity.getGend() != null ? accountEntity.getGend() : ""},
                         {"SPAM", "NN"},
                         {"TOS", "1"},
                 }).collect(Collectors.toMap(data -> data[0], data -> data[1]));
