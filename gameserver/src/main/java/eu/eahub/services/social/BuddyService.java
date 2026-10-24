@@ -47,18 +47,12 @@ public class BuddyService {
         String prod = getValueFromSocket(socketData.getInputMessage(), "PROD");
         String vers = getValueFromSocket(socketData.getInputMessage(), "VERS");
         String lkey = getValueFromSocket(socketData.getInputMessage(), "LKEY");
-        String name = getValueFromSocket(socketData.getInputMessage(), "NAME");
 
         synchronized (this) {
             buddySocketWrapper.setLkey(lkey);
             buddySocketWrapper.setVers(vers);
             PersonaEntity persona = getPersonaFromAriesSocket(buddySocketWrapper);
-            if (persona == null && name != null) {
-                personaRepository.findByPers(name).ifPresent(buddySocketWrapper::setPersonaEntity);
-            } else {
-                buddySocketWrapper.setPersonaEntity(persona);
-            }
-
+            buddySocketWrapper.setPersonaEntity(persona);
         }
 
         Map<String, String> content = Stream.of(new String[][]{
@@ -481,7 +475,11 @@ public class BuddyService {
             buddyEntity.setFromPersona(fromPersona);
             buddyEntity.setToPersona(toPersona);
             buddyEntity.setList(list);
-            buddyEntity.setStatus("A"); // A = Active
+            if ("B".equals(list)) {
+                buddyEntity.setStatus("P"); // P = pending
+            } else {
+                buddyEntity.setStatus("A"); // A = Active
+            }
 
             buddyRepository.save(buddyEntity);
         }

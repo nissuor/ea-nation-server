@@ -24,9 +24,7 @@ import org.springframework.stereotype.Service;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.net.Socket;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -43,8 +41,6 @@ import static eu.eahub.utils.SocketUtils.getValueFromSocket;
 @RequiredArgsConstructor
 @Service
 public class PersonaService {
-
-    private static final String SHA_256_ALGORITHM = "SHA-256";
 
     private final AccountRepository accountRepository;
     private final PersonaRepository personaRepository;
@@ -205,12 +201,9 @@ public class PersonaService {
                 return;
             }
 
-            String lkey = "";
-            try {
-                lkey = formatHexString(MessageDigest.getInstance(SHA_256_ALGORITHM).digest(socketWrapper.getIdentifier().getBytes(StandardCharsets.UTF_8)));
-            } catch (NoSuchAlgorithmException e) {
-                log.error("Error generating lkey for persona {}: {}", personaEntity.getPers(), e.getMessage());
-            }
+            byte[] lkeyBytes = new byte[32];
+            new SecureRandom().nextBytes(lkeyBytes);
+            String lkey = formatHexString(lkeyBytes);
 
             synchronized (this) {
                 socketWrapper.setPersonaEntity(personaEntity);
