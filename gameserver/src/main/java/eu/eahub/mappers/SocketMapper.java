@@ -48,6 +48,7 @@ public class SocketMapper {
     public AccountEntity toAccountEntity(String socket) {
         AccountEntity accountEntity = new AccountEntity();
         setFieldsFromSocket(accountEntity, socket, RETURN_CHAR);
+        accountEntity.setId(null);
         accountEntity.setPass(passwordUtils.bCryptEncode(passwordUtils.ssc2Decode(accountEntity.getPass())));
         accountEntity.setCreatedOn(LocalDateTime.now());
         return accountEntity;
