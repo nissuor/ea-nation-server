@@ -188,6 +188,9 @@ public class SocketProcessor {
             case ("rank"):
                 statsService.rank(socket, socketData, socketWrapper);
                 break;
+            case ("cusr"):
+                statsService.cusr(socket, socketData, socketWrapper);
+                break;
             case ("chal"):
                 gameService.chal(socket, socketData, socketWrapper);
                 break;

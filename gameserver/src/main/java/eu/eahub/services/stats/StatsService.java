@@ -40,6 +40,7 @@ public class StatsService {
     private final NfsRankService nfsRankService;
     private final UserSetService userSetService;
     private final TwStatsService twStatsService;
+    private final TwTournamentService twTournamentService;
 
     /**
      * Retrieve ranking categories
@@ -168,5 +169,20 @@ public class StatsService {
 
         socketData.setOutputData(content);
         socketWriter.write(socket, socketData);
+    }
+
+    /**
+     * Custom user commands: TW04 tournaments and profile
+     *
+     * @param socket        The socket to write the response to
+     * @param socketData    The socket data
+     * @param socketWrapper The socket wrapper of current connection
+     */
+    public void cusr(Socket socket, SocketData socketData, SocketWrapper socketWrapper) {
+        if (ALL_TW.contains(gameServerService.getNameByPort(socket.getLocalPort()))) {
+            twTournamentService.cusr(socket, socketData, socketWrapper);
+        } else {
+            socketWriter.write(socket, socketData);
+        }
     }
 }

@@ -5,6 +5,9 @@ import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
+import java.time.Clock;
+import java.time.ZoneId;
+
 /**
  * Tiger Woods PGA Tour 2004 settings, bound from the tw04.* properties
  */
@@ -14,5 +17,15 @@ import org.springframework.stereotype.Component;
 @ConfigurationProperties(prefix = "tw04")
 public class TwConfig {
 
+    private String timezone = "UTC";
     private String news = "Welcome back to Tiger Woods PGA Tour 2004 online.";
+
+    /**
+     * Get the clock that decides the tournament day
+     *
+     * @return A system clock in the configured timezone
+     */
+    public Clock clock() {
+        return Clock.system(ZoneId.of(timezone));
+    }
 }

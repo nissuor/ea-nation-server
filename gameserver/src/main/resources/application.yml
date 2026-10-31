@@ -24,6 +24,7 @@ tcp:
 ssc2:
   key: 51ba8aee64ddfacae5baefa6bf61e009
 tw04: # Tiger Woods PGA Tour 2004
+  timezone: ${TW04_TIMEZONE:UTC} # Tournament days change at midnight in this timezone
   news: ${TW04_NEWS:Welcome back to Tiger Woods PGA Tour 2004 online.} # Shown on the game's news screen
 
 spring:

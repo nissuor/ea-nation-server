@@ -10,6 +10,7 @@ import eu.eahub.mappers.SocketMapper;
 import eu.eahub.repositories.core.AccountRepository;
 import eu.eahub.repositories.core.BlacklistRepository;
 import eu.eahub.repositories.core.PersonaRepository;
+import eu.eahub.repositories.stats.TwGolferRepository;
 import eu.eahub.services.server.GameServerService;
 import eu.eahub.steps.SocketWriter;
 import eu.eahub.utils.AccountUtils;
@@ -46,6 +47,7 @@ public class AccountService {
     private final SocketWriter socketWriter;
     private final EmailUtils emailUtils;
     private final PersonaRepository personaRepository;
+    private final TwGolferRepository twGolferRepository;
 
     /**
      * Account creation
@@ -298,7 +300,7 @@ public class AccountService {
     }
 
     /**
-     * TW04 asks for another player's profile
+     * TW04 asks for another player's created golfer (CRPIN), uploaded with cusr whomi
      */
     private void twUser(Socket socket, SocketData socketData, SocketWrapper socketWrapper) {
         if (socketWrapper.getPersonaEntity() == null) {
@@ -309,6 +311,10 @@ public class AccountService {
         String pers = LobbyTagField.decode(socketData.getInputMessage()).getOrDefault("PERS", "");
         Map<String, String> content = new LinkedHashMap<>();
         content.put("PERS", pers);
+        personaRepository.findByPers(pers)
+                .filter(persona -> persona.getDeletedOn() == null)
+                .flatMap(persona -> twGolferRepository.findByPersonaIdAndVers(persona.getId(), vers))
+                .ifPresent(golfer -> content.put("CRPIN", golfer.getData()));
         socketWriter.writeTagFields(socket, socketData.getIdMessage(), content);
     }
 }
