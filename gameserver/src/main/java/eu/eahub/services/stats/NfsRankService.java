@@ -45,6 +45,7 @@ public class NfsRankService {
         // Default to 2 if not found (MW don't send NUMPLYRS but always has 2 players)
         int numPlayers = playerCountStr != null ? Integer.parseInt(playerCountStr) : 2;
 
+        // The caller's own connection names the match; the other players' connections must belong to the same match
         Long gameId = null;
         for (int i = 0; i < numPlayers; i++) {
             String playerName = getValueFromSocket(socketData.getInputMessage(), "NAME" + i, TAB_CHAR);

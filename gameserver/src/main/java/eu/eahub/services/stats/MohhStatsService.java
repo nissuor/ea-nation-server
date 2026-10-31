@@ -398,10 +398,7 @@ public class MohhStatsService {
     @Transactional
     public void rank(SocketData socketData, SocketWrapper socketWrapper) {
         String playerName = getValueFromSocket(socketData.getInputMessage(), "REPT", TAB_CHAR);
-        if (socketWrapper.getPersonaEntity() == null) {
-            return;
-        }
-        if (!socketWrapper.getPersonaEntity().getPers().equals(playerName)) {
+        if (socketWrapper.getPersonaEntity() == null || !socketWrapper.getPersonaEntity().getPers().equals(playerName)) {
             return;
         }
         String startTime = getValueFromSocket(socketData.getInputMessage(), "WHEN", TAB_CHAR);

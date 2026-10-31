@@ -226,10 +226,9 @@ public class NhlStatsService {
         if (socketWrapper.getPersonaEntity() == null) {
             return;
         }
-        if (!socketWrapper.getPersonaEntity().getPers().equals(name0)) {
-            if (!socketWrapper.getPersonaEntity().getPers().equals(name1)) {
-                return;
-            }
+        String pers = socketWrapper.getPersonaEntity().getPers();
+        if (!pers.equals(name0) && !pers.equals(name1)) {
+            return;
         }
 
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern(DATETIME_FORMAT);
@@ -239,27 +238,17 @@ public class NhlStatsService {
         List<GameConnectionEntity> gameConnectionsPlayer0 = gameConnectionRepository.findMatchingGameConnections(name0, parsedStartTime, true);
         List<GameConnectionEntity> gameConnectionsPlayer1 = gameConnectionRepository.findMatchingGameConnections(name1, parsedStartTime, true);
 
-        Long gameId = null;
-        if (socketWrapper.getPersonaEntity().getPers().equals(name0)) {
-            if (gameConnectionsPlayer0.isEmpty()) {
-                return;
-            }
-            gameId = gameConnectionsPlayer0.getFirst().getGame().getId();
-        } else {
-            if (gameConnectionsPlayer1.isEmpty()) {
-                return;
-            }
-            gameId = gameConnectionsPlayer1.getFirst().getGame().getId();
+        // The caller's own connection names the match; the other player's connection must belong to the same match
+        List<GameConnectionEntity> ownGameConnections = pers.equals(name0) ? gameConnectionsPlayer0 : gameConnectionsPlayer1;
+        if (ownGameConnections.isEmpty()) {
+            return;
         }
-        if (!gameConnectionsPlayer0.isEmpty()) {
-            if (!gameConnectionsPlayer0.getFirst().getGame().getId().equals(gameId)) {
-                gameConnectionsPlayer0 = List.of();
-            }
+        Long gameId = ownGameConnections.getFirst().getGame().getId();
+        if (!gameConnectionsPlayer0.isEmpty() && !gameConnectionsPlayer0.getFirst().getGame().getId().equals(gameId)) {
+            gameConnectionsPlayer0 = List.of();
         }
-        if (!gameConnectionsPlayer1.isEmpty()) {
-            if (!gameConnectionsPlayer1.getFirst().getGame().getId().equals(gameId)) {
-                gameConnectionsPlayer1 = List.of();
-            }
+        if (!gameConnectionsPlayer1.isEmpty() && !gameConnectionsPlayer1.getFirst().getGame().getId().equals(gameId)) {
+            gameConnectionsPlayer1 = List.of();
         }
 
         // Extract player stats from the packet
