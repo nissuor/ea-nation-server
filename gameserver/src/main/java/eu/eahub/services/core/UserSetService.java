@@ -285,6 +285,12 @@ public class UserSetService {
 
         UserSetEntity userSet = userSetOpt.get();
 
+        if (socketWrapper.getPersonaEntity() == null || userSet.getOwner() == null
+                || !userSet.getOwner().getId().equals(socketWrapper.getPersonaEntity().getId())) {
+            socketWriter.write(socket, socketData);
+            return;
+        }
+
         String vers = userSet.getVers();
 
         // Get all members before deleting
@@ -341,6 +347,12 @@ public class UserSetService {
         }
 
         UserSetEntity userSet = userSetOpt.get();
+
+        if (socketWrapper.getPersonaEntity() == null || userSet.getOwner() == null
+                || !userSet.getOwner().getId().equals(socketWrapper.getPersonaEntity().getId())) {
+            socketWriter.write(socket, socketData);
+            return;
+        }
 
         // Update fields if provided
         if (desc != null) {

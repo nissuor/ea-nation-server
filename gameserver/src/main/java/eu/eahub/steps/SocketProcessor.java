@@ -210,7 +210,7 @@ public class SocketProcessor {
                 gameService.glea(socket, socketData, socketWrapper);
                 break;
             case ("gpss"):
-                gameService.gpss(socket, socketData);
+                gameService.gpss(socket, socketData, socketWrapper);
                 break;
             case ("gsta"):
                 gameService.gsta(socket, socketData, socketWrapper);
