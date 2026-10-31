@@ -10,6 +10,7 @@ import eu.eahub.mappers.SocketMapper;
 import eu.eahub.repositories.core.*;
 import eu.eahub.services.server.GameServerService;
 import eu.eahub.services.server.SocketManager;
+import eu.eahub.services.server.TwRelayService;
 import eu.eahub.services.stats.MohhStatsService;
 import eu.eahub.steps.SocketWriter;
 import eu.eahub.utils.GameUtils;
@@ -62,6 +63,7 @@ public class GameService {
     private final GameUtils gameUtils;
     private final TwChallengeService twChallengeService;
     private final TwRoomService twRoomService;
+    private final TwRelayService twRelayService;
 
 
     /**
@@ -1170,6 +1172,18 @@ public class GameService {
                 + (challenge.getModeFlags() == null ? "" : "," + challenge.getModeFlags());
         String name = room != null ? room.getName() : (challenge.isStrokePlay() ? "Stroke" : "Match") + ".B.Buddy";
         GameEntity game = startSession(host.getPersonaConnectionEntity().getVers(), room, name, params, host, guest);
+        Map<Long, String> addresses;
+        try {
+            // Through the relay when it is enabled, otherwise the players connect to each other
+            addresses = twRelayService.reserve(game, host, guest);
+        } catch (IllegalStateException e) {
+            log.warn("TW04 session refused: {}", e.getMessage());
+            endSession(game, "cancelled");
+            socketWriter.writeText(host.getSocket(), "chalunav", "");
+            socketWriter.writeText(guest.getSocket(), "chalunav", "");
+            twChallengeService.cancel(host, false);
+            return;
+        }
         challenge.setGameId(game.getId());
         String token = UUID.randomUUID().toString().replace("-", "");
         twChallengeService.addSessionToken(token, game.getId());
@@ -1185,13 +1199,13 @@ public class GameService {
             fields.put("P1", host.getPersonaEntity().getPers());
             fields.put("P2", guest.getPersonaEntity().getPers());
             fields.put("FROM", other.getPersonaEntity().getPers());
-            fields.put("ADDR", twRoomService.peerAddress(other, player));
+            fields.put("ADDR", addresses.getOrDefault(player.getPersonaEntity().getId(), twRoomService.peerAddress(other, player)));
             fields.put("SEED", String.valueOf(seed));
             fields.put("WHEN", when);
             fields.put("AUTH", token);
             socketWriter.writeTagFields(player.getSocket(), "+ses", fields);
-            log.info("TW04 session start: {} -> peer {} at {} (UDP)", player.getPersonaEntity().getPers(),
-                    other.getPersonaEntity().getPers(), fields.get("ADDR"));
+            log.info("TW04 session start: {} -> peer {} at {} (UDP, relay={})", player.getPersonaEntity().getPers(),
+                    other.getPersonaEntity().getPers(), fields.get("ADDR"), !addresses.isEmpty());
         }
     }
 
@@ -1258,6 +1272,7 @@ public class GameService {
                 twRoomService.removeSession(game);
             }
             twChallengeService.removeSessionToken(game.getId());
+            twRelayService.release(game);
             log.info("Session {} ended: {}", game.getId(), reason);
         }
     }

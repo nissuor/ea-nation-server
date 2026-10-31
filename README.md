@@ -120,7 +120,7 @@ Notes:
 - **Tiger Woods PGA Tour 2004 (PS2, SLUS-20757) connects to the numeric IP address built into the game, so it can't be
   redirected by DNS: it needs a patch made for your server's address, which also skips DNAS. The `BUDDY` server must be
   enabled for its Messenger. Head-to-head rounds are played peer-to-peer on UDP 3658, so the host needs that port
-  forwarded**
+  forwarded, unless the server enables the `tw04.relay` UDP relay and forwards it once for everyone**
 - All the other PS2 games requires a DNAS patch unless they are supported by DNASrep.
   See [pnach](https://github.com/a-blondel/ea-nation-patches/tree/main/PS2/pnach) folder for your specific game
 - Partial support means that some features are not implemented yet, like:
