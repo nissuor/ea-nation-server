@@ -226,17 +226,25 @@ public class FifaStatsService {
     /**
      * Send ranking results.
      *
-     * @param socketData The socket data
+     * @param socketData    The socket data
+     * @param socketWrapper The socket wrapper of current connection
      */
     @Transactional
-    public void rank(SocketData socketData) {
+    public void rank(SocketData socketData, SocketWrapper socketWrapper) {
         try {
+            if (socketWrapper.getPersonaEntity() == null) {
+                return;
+            }
             // Determine the splitter used in the input message
             String splitter = socketData.getInputMessage().contains(TAB_CHAR) ? TAB_CHAR : RETURN_CHAR;
 
             String startTime = getValueFromSocket(socketData.getInputMessage(), "WHEN", splitter);
             String name0 = getValueFromSocket(socketData.getInputMessage(), "NAME0", splitter);
             String name1 = getValueFromSocket(socketData.getInputMessage(), "NAME1", splitter);
+            String pers = socketWrapper.getPersonaEntity().getPers();
+            if (!pers.equals(name0) && !pers.equals(name1)) {
+                return;
+            }
 
             DateTimeFormatter formatter = DateTimeFormatter.ofPattern(DATETIME_FORMAT);
             LocalDateTime parsedStartTime = LocalDateTime.parse(startTime, formatter);
@@ -244,6 +252,19 @@ public class FifaStatsService {
             // Find game connections for both players
             List<GameConnectionEntity> gameConnectionsPlayer0 = gameConnectionRepository.findMatchingGameConnections(name0, parsedStartTime, true);
             List<GameConnectionEntity> gameConnectionsPlayer1 = gameConnectionRepository.findMatchingGameConnections(name1, parsedStartTime, true);
+
+            // The caller's own connection names the match; the other player's connection must belong to the same match
+            List<GameConnectionEntity> ownGameConnections = pers.equals(name0) ? gameConnectionsPlayer0 : gameConnectionsPlayer1;
+            if (ownGameConnections.isEmpty()) {
+                return;
+            }
+            Long gameId = ownGameConnections.getFirst().getGame().getId();
+            if (!gameConnectionsPlayer0.isEmpty() && !gameConnectionsPlayer0.getFirst().getGame().getId().equals(gameId)) {
+                gameConnectionsPlayer0 = List.of();
+            }
+            if (!gameConnectionsPlayer1.isEmpty() && !gameConnectionsPlayer1.getFirst().getGame().getId().equals(gameId)) {
+                gameConnectionsPlayer1 = List.of();
+            }
 
             // Apply pessimistic lock to prevent concurrent updates
             if (!gameConnectionsPlayer0.isEmpty()) {
