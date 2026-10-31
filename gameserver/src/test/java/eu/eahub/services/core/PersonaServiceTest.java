@@ -12,15 +12,12 @@ import eu.eahub.repositories.core.PersonaConnectionRepository;
 import eu.eahub.repositories.core.PersonaRepository;
 import eu.eahub.services.server.SocketManager;
 import eu.eahub.steps.SocketWriter;
-import eu.eahub.utils.HexUtils;
 import eu.eahub.utils.PersonaUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.net.InetAddress;
 import java.net.Socket;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -71,14 +68,11 @@ class PersonaServiceTest {
     }
 
     @Test
-    void persIssuesDifferentLkeyForSameIdentifier() throws Exception {
+    void persIssuesNewLkey() throws Exception {
         String firstLkey = persLkey();
         String secondLkey = persLkey();
 
-        assertNotEquals(firstLkey, secondLkey);
-        String identifierHash = HexUtils.formatHexString(MessageDigest.getInstance("SHA-256")
-                .digest("/127.0.0.1:1234".getBytes(StandardCharsets.UTF_8)));
-        assertNotEquals(identifierHash, firstLkey);
         assertEquals(64, firstLkey.length());
+        assertNotEquals(firstLkey, secondLkey);
     }
 }

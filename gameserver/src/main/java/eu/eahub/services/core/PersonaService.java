@@ -42,6 +42,8 @@ import static eu.eahub.utils.SocketUtils.getValueFromSocket;
 @Service
 public class PersonaService {
 
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+
     private final AccountRepository accountRepository;
     private final PersonaRepository personaRepository;
     private final PersonaConnectionRepository personaConnectionRepository;
@@ -201,8 +203,9 @@ public class PersonaService {
                 return;
             }
 
+            // A random key per session, which the buddy server checks on AUTH
             byte[] lkeyBytes = new byte[32];
-            new SecureRandom().nextBytes(lkeyBytes);
+            SECURE_RANDOM.nextBytes(lkeyBytes);
             String lkey = formatHexString(lkeyBytes);
 
             synchronized (this) {
