@@ -241,12 +241,8 @@ public class GameService {
                     return;
                 }
             }
-            if (sysflags != null) {
-                try {
-                    Integer.parseInt(sysflags);
-                } catch (NumberFormatException e) {
-                    sysflags = null; // Invalid sysflags format
-                }
+            if (sysflags != null && !isValidSysflags(sysflags)) {
+                sysflags = null;
             }
             if (sysflags != null) {
                 // Update sysflags in the game entity
@@ -334,14 +330,7 @@ public class GameService {
                     gameEntity.setEndTime(now);
                     gameRepository.save(gameEntity);
 
-                    String newSysflags = sysflags;
-                    if (newSysflags != null) {
-                        try {
-                            Integer.parseInt(newSysflags);
-                        } catch (NumberFormatException e) {
-                            newSysflags = gameEntity.getSysflags(); // Invalid sysflags format
-                        }
-                    }
+                    String newSysflags = sysflags == null || isValidSysflags(sysflags) ? sysflags : gameEntity.getSysflags();
 
                     GameEntity newGameEntity = new GameEntity();
                     newGameEntity.setOriginalId(Optional.ofNullable(gameEntity.getOriginalId()).orElse(gameEntity.getId()));
@@ -685,13 +674,9 @@ public class GameService {
 
         if (gameEntity.getSysflags() == null) {
             gameEntity.setSysflags("0");
-        } else {
-            try {
-                Integer.parseInt(gameEntity.getSysflags());
-            } catch (NumberFormatException e) {
-                socketWriter.write(socket, socketData); // Invalid sysflags format
-                return;
-            }
+        } else if (!isValidSysflags(gameEntity.getSysflags())) {
+            socketWriter.write(socket, socketData);
+            return;
         }
 
         String userparams = getValueFromSocket(socketData.getInputMessage(), "USERPARAMS");
@@ -897,6 +882,21 @@ public class GameService {
         }).collect(Collectors.toMap(data -> data[0], data -> data[1]));
         socketData.setOutputData(content);
         socketWriter.write(socket, socketData);
+    }
+
+    /**
+     * Check that SYSFLAGS is a number, as the games send it
+     *
+     * @param sysflags The SYSFLAGS value
+     * @return true if it is an integer
+     */
+    private static boolean isValidSysflags(String sysflags) {
+        try {
+            Integer.parseInt(sysflags);
+            return true;
+        } catch (NumberFormatException e) {
+            return false;
+        }
     }
 
     /**
