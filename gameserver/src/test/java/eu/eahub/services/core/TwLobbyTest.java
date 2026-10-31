@@ -17,6 +17,7 @@ import eu.eahub.services.TwFrames;
 import eu.eahub.services.TwTestConfig;
 import eu.eahub.services.server.GameServerService;
 import eu.eahub.services.server.SocketManager;
+import eu.eahub.services.server.TwRelayService;
 import eu.eahub.services.social.TwBuddyService;
 import eu.eahub.services.social.TwChatHistoryService;
 import eu.eahub.services.stats.FifaStatsService;
@@ -64,7 +65,10 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -105,6 +109,8 @@ class TwLobbyTest {
     private FifaStatsService fifaStatsService;
     @MockitoBean
     private NfsRankService nfsRankService;
+    @MockitoBean
+    private TwRelayService relay;
     @Autowired
     private TwConfig twConfig;
 
@@ -149,6 +155,7 @@ class TwLobbyTest {
         roomService.generateRooms();
         when(props.getTcpHost()).thenReturn("127.0.0.1");
         when(props.getTcpBuddyPort()).thenReturn(13504);
+        when(relay.reserve(any(), any(), any())).thenReturn(Map.of());
         frames.capture(socketWriter);
     }
 
@@ -466,12 +473,14 @@ class TwLobbyTest {
         SocketWrapper[] pair = pair();
         SocketWrapper a = pair[0];
         SocketWrapper b = pair[1];
+        when(relay.reserve(any(), any(), any())).thenReturn(Map.of(1L, "203.0.113.9", 2L, "203.0.113.9"));
         Map<String, String> session = start(a, b);
-        assertEquals("198.51.100.90", session.get("ADDR"));
-        assertEquals("198.51.100.10", received(b, "+ses").getFirst().fields().get("ADDR"));
+        assertEquals("203.0.113.9", session.get("ADDR"));
+        assertEquals("203.0.113.9", received(b, "+ses").getFirst().fields().get("ADDR"));
         disconnect(a);
         disconnect(b);
         assertNull(gameRepository.findById(game(session).getId()).orElseThrow().getEndTime());
+        verify(relay, never()).release(any(GameEntity.class));
 
         SocketWrapper back = player(2, "198.51.100.90");
         send(back, "move", "NAME=Match.T.East");
@@ -479,6 +488,7 @@ class TwLobbyTest {
         assertEquals("SUCCESS", received(back, "rank").getLast().fields().get("TITLE"));
         GameEntity game = game(session);
         assertNotNull(game.getEndTime());
+        verify(relay).release(any(GameEntity.class));
         // The second report is accepted without counting the match again
         SocketWrapper alice = player(1, "198.51.100.10");
         send(alice, "rank", result(session));
@@ -506,6 +516,20 @@ class TwLobbyTest {
                 "R", frames.last().fields().get("R"), "P", frames.last().fields().get("P")));
     }
 
+    @Test
+    void relayRefusalCancelsTheSessionWithoutFallingBackToADirectMatch() throws Exception {
+        SocketWrapper[] pair = pair();
+        when(relay.reserve(any(), any(), any())).thenThrow(new IllegalStateException("busy"));
+        invite(pair[0], pair[1]);
+        send(pair[0], "chal", "PERS=Bob HOST=1");
+        send(pair[1], "chal", "PERS=Alice HOST=0");
+        assertTrue(received(pair[0], "+ses").isEmpty());
+        assertTrue(received(pair[1], "+ses").isEmpty());
+        assertEquals(1, received(pair[0], "chalunav").size());
+        assertEquals(1, received(pair[1], "chalunav").size());
+        assertTrue(gameRepository.findAll().stream().allMatch(game -> game.getEndTime() != null));
+        verify(relay).release(any(GameEntity.class));
+    }
 
     @Test
     void cannotStartWithoutInvitationAcceptanceOrWithTheWrongHostRole() throws Exception {
@@ -558,6 +582,7 @@ class TwLobbyTest {
         assertEquals(1, received(b, "mesgingm").size());
         send(a, "rank", result(first));
         assertEquals("SUCCESS", received(a, "rank").getLast().fields().get("TITLE"));
+        verify(relay).release(any(GameEntity.class));
         // The reported match ended the challenge, so a new one can start
         Map<String, String> second = start(b, a);
         assertEquals(2, received(a, "+ses").size());
@@ -579,6 +604,7 @@ class TwLobbyTest {
         Map<String, String> first = rewind(start(a, b));
         send(a, "chal", "PERS=*");
         assertNotNull(game(first).getEndTime());
+        verify(relay).release(any(GameEntity.class));
         Map<String, String> second = start(b, a);
         assertNotEquals(first.get("AUTH"), second.get("AUTH"));
         // The cancelled match still counts once it is reported with its own token
