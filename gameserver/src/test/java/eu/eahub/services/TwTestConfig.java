@@ -22,8 +22,8 @@ public class TwTestConfig {
      * @param names the persona names
      */
     public static void reset(JdbcTemplate jdbc, String... names) {
-        for (String table : new String[]{"stats.TW_GAME_REPORT", "stats.TW_PERSONA_STATS", "social.FEEDBACK", "social.BUDDY",
-                "core.GAME_CONNECTION", "core.GAME", "core.PERSONA_CONNECTION", "core.PERSONA", "core.ACCOUNT"}) {
+        for (String table : new String[]{"stats.TW_GAME_REPORT", "stats.TW_PERSONA_STATS", "stats.TW_ENTRY", "stats.TW_EVENT", "stats.TW_GOLFER",
+                "social.FEEDBACK", "social.BUDDY", "core.GAME_CONNECTION", "core.GAME", "core.PERSONA_CONNECTION", "core.PERSONA", "core.ACCOUNT"}) {
             jdbc.update("DELETE FROM " + table);
         }
         for (String name : names) {

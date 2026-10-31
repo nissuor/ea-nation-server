@@ -26,6 +26,7 @@ import eu.eahub.services.stats.NfsStatsService;
 import eu.eahub.services.stats.NhlStatsService;
 import eu.eahub.services.stats.StatsService;
 import eu.eahub.services.stats.TwStatsService;
+import eu.eahub.services.stats.TwTournamentService;
 import eu.eahub.steps.SocketWriter;
 import eu.eahub.utils.EmailUtils;
 import eu.eahub.utils.GameUtils;
@@ -73,7 +74,7 @@ import static org.mockito.Mockito.when;
 @ContextConfiguration(classes = TwTestConfig.class)
 @Import({TwConfig.class, RoomService.class, GameService.class, AuthService.class, AccountService.class, UserSetService.class, PersonaService.class,
         StatsService.class, SocketManager.class, GameServerService.class, GameUtils.class, PersonaUtils.class, TwStatsService.class,
-        TwChallengeService.class, TwRoomService.class, TwChatHistoryService.class, TwBuddyService.class,
+        TwTournamentService.class, TwChallengeService.class, TwRoomService.class, TwChatHistoryService.class, TwBuddyService.class,
         GameServerConfig.class})
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
@@ -192,6 +193,7 @@ class TwLobbyTest {
             case "chal" -> gameService.chal(socket, data, player);
             case "rank" -> statsService.rank(socket, data, player);
             case "snap" -> statsService.snap(socket, data, player);
+            case "cusr" -> statsService.cusr(socket, data, player);
             case "user" -> accountService.user(socket, data, player);
             case "onln" -> userSetService.onln(socket, data, player);
             default -> throw new IllegalArgumentException(verb);
@@ -668,5 +670,23 @@ class TwLobbyTest {
         send(a, "chal", "PERS=*");
         send(b, "addr", "ADDR=192.0.2.100 PORT=3658");
         assertEquals("203.0.113.1", start(a, b).get("ADDR"));
+    }
+
+    @Test
+    void golferUploadBelongsToTheAuthenticatedPersonaAndIsReturnedAsBinary() throws Exception {
+        SocketWrapper[] pair = pair();
+        SocketWrapper a = pair[0];
+        SocketWrapper b = pair[1];
+        send(a, "cusr", "CMD=whomi PERS=Bob CRPIN=\u0080À\u0080!");
+        send(b, "user", "PERS=Alice");
+        assertEquals("$80c08021", received(b, "user").getLast().fields().get("CRPIN"));
+        send(a, "user", "PERS=Bob");
+        assertFalse(received(a, "user").getLast().fields().containsKey("CRPIN"));
+        // A profile shows the same standing as the room roster
+        send(a, "peek", "NAME=Match.T.East");
+        send(a, "onln", "PERS=Bob");
+        Map<String, String> profile = received(a, "onln").getLast().fields();
+        assertEquals("0", profile.get("R"));
+        assertEquals(received(a, "+usr").stream().filter(frame -> "Bob".equals(frame.fields().get("N"))).toList().getLast().fields().get("S"), profile.get("S"));
     }
 }
