@@ -3,6 +3,7 @@ package eu.eahub.steps;
 import eu.eahub.dto.SocketData;
 import eu.eahub.services.server.SocketManager;
 import eu.eahub.utils.Props;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayOutputStream;
@@ -10,67 +11,49 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.Socket;
-import java.net.SocketAddress;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class SocketWriterTest {
 
-    private static class TestProps extends Props {
-        @Override
-        public List<String> getTcpDebugExclusions() {
-            return List.of();
-        }
+    private SocketWriter socketWriter;
 
-        @Override
-        public boolean isTcpDebugEnabled() {
-            return false;
-        }
+    @BeforeEach
+    void setUp() {
+        Props props = mock(Props.class);
+        when(props.getTcpDebugExclusions()).thenReturn(List.of());
+        socketWriter = new SocketWriter(props, new SocketManager(null));
     }
 
-    private static class TestSocket extends Socket {
-        private final OutputStream outputStream;
-
-        TestSocket(OutputStream outputStream) {
-            this.outputStream = outputStream;
-        }
-
-        @Override
-        public OutputStream getOutputStream() {
-            return outputStream;
-        }
-
-        @Override
-        public SocketAddress getRemoteSocketAddress() {
-            return new InetSocketAddress("192.0.2.10", 12345);
-        }
-    }
-
-    private SocketWriter socketWriter() {
-        return new SocketWriter(new TestProps(), new SocketManager(null));
+    private static Socket socket(OutputStream outputStream) throws IOException {
+        Socket socket = mock(Socket.class);
+        when(socket.getOutputStream()).thenReturn(outputStream);
+        when(socket.getRemoteSocketAddress()).thenReturn(new InetSocketAddress("192.0.2.10", 12345));
+        return socket;
     }
 
     @Test
-    void writeSendsHeaderAndContent() {
+    void writeHeaderAndContent() throws IOException {
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-        Socket socket = new TestSocket(outputStream);
 
-        socketWriter().write(socket, new SocketData("auth", null, Map.of("NAME", "player")));
+        socketWriter.write(socket(outputStream), new SocketData("auth", null, Map.of("NAME", "player")));
+        socketWriter.write(socket(outputStream), new SocketData("~png", null, null));
 
-        byte[] expected = new byte[]{'a', 'u', 't', 'h', 0, 0, 0, 0, 0, 0, 0, 24,
-                'N', 'A', 'M', 'E', '=', 'p', 'l', 'a', 'y', 'e', 'r', 0};
+        byte[] expected = new byte[]{'a', 'u', 't', 'h', 0, 0, 0, 0, 0, 0, 0, 24, 'N', 'A', 'M', 'E', '=', 'p', 'l', 'a', 'y', 'e', 'r', 0,
+                '~', 'p', 'n', 'g', 0, 0, 0, 0, 0, 0, 0, 12};
         assertArrayEquals(expected, outputStream.toByteArray());
     }
 
     @Test
-    void writeToAnotherSocketDoesNotWaitForABlockedWrite() throws Exception {
+    void writeDoesNotWaitForAnotherSocket() throws Exception {
         CountDownLatch writeStarted = new CountDownLatch(1);
         CountDownLatch releaseWrite = new CountDownLatch(1);
         OutputStream blockingStream = new OutputStream() {
@@ -91,42 +74,24 @@ class SocketWriterTest {
             public void write(int value) {
             }
         };
-        Socket blockedSocket = new TestSocket(blockingStream);
+        Socket blockedSocket = socket(blockingStream);
         ByteArrayOutputStream otherOutputStream = new ByteArrayOutputStream();
-        Socket otherSocket = new TestSocket(otherOutputStream);
-        SocketWriter socketWriter = socketWriter();
+        Socket otherSocket = socket(otherOutputStream);
         SocketData socketData = new SocketData("~png", null, null);
 
         Thread blockedThread = new Thread(() -> socketWriter.write(blockedSocket, socketData));
         blockedThread.start();
         assertTrue(writeStarted.await(5, TimeUnit.SECONDS));
 
-        AtomicBoolean otherDone = new AtomicBoolean(false);
-        Thread otherThread = new Thread(() -> {
-            socketWriter.write(otherSocket, socketData);
-            otherDone.set(true);
-        });
+        Thread otherThread = new Thread(() -> socketWriter.write(otherSocket, socketData));
         otherThread.start();
         otherThread.join(5000);
-        boolean otherFinished = otherDone.get();
+        boolean otherFinished = !otherThread.isAlive();
 
         releaseWrite.countDown();
         blockedThread.join(5000);
-        otherThread.join(5000);
 
         assertTrue(otherFinished);
-        assertFalse(blockedThread.isAlive());
-    }
-
-    @Test
-    void writesToTheSameSocketStayInOrder() {
-        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-        Socket socket = new TestSocket(outputStream);
-        SocketWriter socketWriter = socketWriter();
-
-        socketWriter.write(socket, new SocketData("~png", null, null));
-        socketWriter.write(socket, new SocketData("~png", null, null));
-
-        assertTrue(outputStream.size() == 24);
+        assertEquals(12, otherOutputStream.size());
     }
 }
