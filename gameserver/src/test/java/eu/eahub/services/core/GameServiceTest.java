@@ -29,6 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -62,6 +63,7 @@ class GameServiceTest {
             GameConnectionEntity gameConnectionEntity = new GameConnectionEntity();
             gameConnectionEntity.setGame(gameEntity);
             gameConnectionEntity.setPersonaConnection(socketWrapper.getPersonaConnectionEntity());
+            gameConnectionEntity.setHost(id == 1);
             gameConnections.add(gameConnectionEntity);
             socketWrappers.add(socketWrapper);
             when(gameConnectionRepository.findByPersonaConnectionIdAndEndTimeIsNull(id)).thenReturn(Optional.of(gameConnectionEntity));
@@ -88,6 +90,37 @@ class GameServiceTest {
                     && "GS=ready".equals(data.getOutputData().get("PARAMS"))));
         }
         verify(socketWriter).write(eq(host.getSocket()), argThat(data -> "gset".equals(data.getIdMessage())));
+    }
+
+    @Test
+    void coachGuestCannotUpdateSharedGameState() {
+        when(gameServerService.isP2P(PC_COACH06)).thenReturn(true);
+        GameEntity gameEntity = new GameEntity();
+        gameEntity.setId(34L);
+        gameEntity.setVers(PC_COACH06);
+        gameEntity.setParams("old");
+        gameEntity.setSysflags("0");
+
+        SocketWrapper guest = getSocketWrapper(2, PC_COACH06);
+        GameConnectionEntity gameConnectionEntity = new GameConnectionEntity();
+        gameConnectionEntity.setGame(gameEntity);
+        gameConnectionEntity.setPersonaConnection(guest.getPersonaConnectionEntity());
+        gameConnectionEntity.setHost(false);
+        when(gameConnectionRepository.findByPersonaConnectionIdAndEndTimeIsNull(2L))
+                .thenReturn(Optional.of(gameConnectionEntity));
+        when(gameConnectionRepository.findByGameIdAndEndTimeIsNull(34L)).thenReturn(List.of(gameConnectionEntity));
+        when(socketManager.getSocketWrapperByPersonaConnectionId(2L)).thenReturn(guest);
+        when(gameUtils.getGameInfo(gameEntity)).thenReturn(Map.of("IDENT", "34", "PARAMS", "old"));
+
+        SocketData socketData = new SocketData("gset",
+                "USERFLAGS=1\nUSERPARAMS=" + USERPARAMS + "\nSYSFLAGS=327688\nPARAMS=GS=ready\0", null);
+        gameService.gset(guest.getSocket(), socketData, guest);
+
+        assertEquals("0", gameEntity.getSysflags());
+        assertEquals("old", gameEntity.getParams());
+        assertEquals("1", guest.getUserflags());
+        assertEquals(USERPARAMS, guest.getUserparams());
+        verify(gameRepository, never()).save(gameEntity);
     }
 
     @Test

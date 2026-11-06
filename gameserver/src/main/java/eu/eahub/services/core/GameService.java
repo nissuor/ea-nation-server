@@ -305,17 +305,22 @@ public class GameService {
             socketWrapper.setUserparams(userparams);
         }
 
-        GameEntity gameEntity = gameConnectionRepository.findByPersonaConnectionIdAndEndTimeIsNull(personaConnectionEntity.getId())
-                .map(GameConnectionEntity::getGame).orElse(null);
+        Optional<GameConnectionEntity> gameConnectionEntityOpt =
+                gameConnectionRepository.findByPersonaConnectionIdAndEndTimeIsNull(personaConnectionEntity.getId());
+        GameEntity gameEntity = gameConnectionEntityOpt.map(GameConnectionEntity::getGame).orElse(null);
         if (gameEntity != null) {
-            if (sysflags != null) {
-                gameEntity.setSysflags(sysflags);
-            }
-            if (params != null) {
-                gameEntity.setParams(params);
-            }
-            if (sysflags != null || params != null) {
-                gameRepository.save(gameEntity);
+            if (gameConnectionEntityOpt.filter(GameConnectionEntity::isHost).isPresent()) {
+                if (sysflags != null) {
+                    gameEntity.setSysflags(sysflags);
+                }
+                if (params != null) {
+                    gameEntity.setParams(params);
+                }
+                if (sysflags != null || params != null) {
+                    gameRepository.save(gameEntity);
+                }
+            } else if (sysflags != null || params != null) {
+                log.warn("Ignoring shared game-state update from a non-host Coach connection");
             }
             // Broadcast the game state to all players in the game
             broadcastGameStateToPlayers(personaConnectionEntity);
