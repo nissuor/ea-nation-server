@@ -26,6 +26,7 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static eu.eahub.services.server.GameServerService.PC_COACH06;
 import static eu.eahub.utils.SocketUtils.TAB_CHAR;
 import static eu.eahub.utils.SocketUtils.getValueFromSocket;
 
@@ -411,7 +412,12 @@ public class UserSetService {
         SocketWrapper targetWrapper = socketManager.getSocketWrapperByPersonaNameAndVers(pers, vers);
         if (targetWrapper != null && targetWrapper.getPersonaEntity() != null) {
             Room room = roomService.getRoomByPersonaId(socketWrapper.getPersonaEntity().getId());
-            Map<String, String> personaInfo = personaUtils.getPersonaInfo(socket, targetWrapper, room);
+            Map<String, String> personaInfo;
+            if (PC_COACH06.equals(vers)) {
+                personaInfo = personaUtils.getCoachPersonaInfo(socket, targetWrapper, room);
+            } else {
+                personaInfo = personaUtils.getPersonaInfo(socket, targetWrapper, room);
+            }
             socketData.setOutputData(personaInfo);
         }
         socketWriter.write(socket, socketData);

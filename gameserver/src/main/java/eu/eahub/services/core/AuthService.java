@@ -15,6 +15,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static eu.eahub.services.server.GameServerService.PC_COACH06;
 import static eu.eahub.utils.SocketUtils.SPACE_CHAR;
 import static eu.eahub.utils.SocketUtils.getValueFromSocket;
 
@@ -96,6 +97,12 @@ public class AuthService {
                 {"ROSTER_URL", rosterUrl}, // Required by NHL/FIFA 07 (roster download isn't implemented, but it is required by the game)
                 {"ROSTER_VER", "1.0"}, // Trick to skip roster download for NHL 07
         }).collect(Collectors.toMap(data -> data[0], data -> data[1]));
+
+        if (PC_COACH06.equals(name)) {
+            // NFL Head Coach crashes when parsing the roster URL (no file extension), and there is no roster to download anyway
+            content.remove("ROSTER_URL");
+            content.remove("ROSTER_VER");
+        }
 
         String newsName = getValueFromSocket(socketData.getInputMessage(), "NAME");
         // if name exists and is a number

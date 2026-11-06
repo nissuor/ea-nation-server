@@ -119,6 +119,24 @@ public class PersonaUtils {
     }
 
     /**
+     * Get persona info for NFL Head Coach, as seen by the recipient
+     * The game copies every record with F=U into its own persona, so only the recipient's own record has it,
+     * otherwise both players can't agree on Ready. A and LA are always the address of the described player.
+     *
+     * @param socket        the socket of the recipient
+     * @param socketWrapper the socket wrapper of the described player
+     * @param room          the room
+     * @return the persona info
+     */
+    public Map<String, String> getCoachPersonaInfo(Socket socket, SocketWrapper socketWrapper, Room room) {
+        Map<String, String> personaInfo = getPersonaInfo(socketWrapper.getSocket(), socketWrapper, room);
+        if (!socket.equals(socketWrapper.getSocket())) {
+            personaInfo.put("F", "");
+        }
+        return personaInfo;
+    }
+
+    /**
      * Get UserSet name for the given SocketWrapper
      *
      * @param socketWrapper the SocketWrapper
