@@ -58,7 +58,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @DataJpaTest
 @ContextConfiguration(classes = TwTestConfig.class)
-@Import(TwStatsService.class)
+@Import({TwStatsService.class, TwTournamentService.class})
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class TwStatsServiceTest {
 
@@ -89,6 +89,8 @@ class TwStatsServiceTest {
     private TwChallengeService twChallengeService;
     @MockitoBean
     private SocketWriter socketWriter;
+    @MockitoBean
+    private eu.eahub.config.TwConfig twConfig;
     private GameEntity game;
     private int games;
 
@@ -396,7 +398,8 @@ class TwStatsServiceTest {
         assertEquals(List.of(), stats.board(PS2_TW04, 30, 0, 25, ""));
         assertTrue(TwStatsService.isStatList(1) && TwStatsService.isStatList(31));
         assertFalse(TwStatsService.isStatList(TwStatsService.BOARD_OVERALL) || TwStatsService.isStatList(TwStatsService.BOARD_MATCH_PLAY)
-                || TwStatsService.isStatList(TwStatsService.BOARD_STROKE_PLAY) || TwStatsService.isStatList(TwStatsService.BOARD_LAST_WEEK));
+                || TwStatsService.isStatList(TwStatsService.BOARD_STROKE_PLAY) || TwStatsService.isStatList(TwStatsService.BOARD_LAST_WEEK)
+                || TwStatsService.isStatList(TwTournamentService.BOARD_LAST_WINNERS));
     }
 
     @Test

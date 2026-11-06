@@ -40,6 +40,8 @@ public class SocketWrapper {
     private volatile String reportedAddress = "";
     // Number of +usr records last sent, so that departed users can be removed (TW04)
     private volatile int rosterSize;
+    // First day of the tournament season shown to the client (TW04)
+    private volatile Integer seasonFirst;
 
 
     public void cleanupOnSocketClose(SocketWrapper socketWrapper) {

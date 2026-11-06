@@ -87,14 +87,14 @@ public class TwStatsService {
     private final GameConnectionRepository gameConnectionRepository;
     private final GameRepository gameRepository;
     private final PersonaRepository personaRepository;
+    private final TwTournamentService twTournamentService;
     private final TwChallengeService twChallengeService;
     private final SocketWriter socketWriter;
 
     /**
      * Request ranking snapshot (snap)
      * INDEX 0 is the overall board, 13 Match Play, 14 Stroke Play, 32 the last seven days, 1 to 31 one statistic each,
-     * and the others are tournament boards, answered empty. The snap acknowledgement arms the channel (4 or 5) before its
-     * +snp rows arrive
+     * and the others are tournament boards. The snap acknowledgement arms the channel (4 or 5) before its +snp rows arrive
      *
      * @param socket        The socket to write the response to
      * @param socketData    The socket data
@@ -116,9 +116,9 @@ public class TwStatsService {
         int start = Math.max(0, LobbyTagField.getNumber(fields, "START", 0));
         int count = Math.clamp(LobbyTagField.getNumber(fields, "RANGE", DEFAULT_RANGE), 0, MAX_RANGE);
         String find = fields.getOrDefault("FIND", "");
-        boolean headToHead = index == BOARD_OVERALL || index == BOARD_MATCH_PLAY || index == BOARD_STROKE_PLAY
-                || index == BOARD_LAST_WEEK || isStatList(index);
-        List<TwStanding> page = headToHead ? board(vers, index, start, count, find) : List.of();
+        List<TwStanding> page = TwTournamentService.isTournamentBoard(index)
+                ? twTournamentService.board(vers, index, socketWrapper.getSeasonFirst(), start, count, find)
+                : board(vers, index, start, count, find);
         String chan = String.valueOf(channel);
         String size = String.valueOf(page.size());
         socketWriter.writeTagFields(socket, "snap", Map.of("CHAN", chan, "COUNT", size, "RANGE", size, "MORE", "0"));
