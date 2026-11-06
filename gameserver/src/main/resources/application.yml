@@ -26,6 +26,9 @@ ssc2:
 tw04: # Tiger Woods PGA Tour 2004
   timezone: ${TW04_TIMEZONE:UTC} # Tournament days change at midnight in this timezone
   news: ${TW04_NEWS:Welcome back to Tiger Woods PGA Tour 2004 online.} # Shown on the game's news screen
+  relay: # Optional UDP relay on port 3658, so that players need no port forwarding
+    enabled: ${TW04_RELAY_ENABLED:false}
+    public-address: ${TW04_RELAY_PUBLIC_ADDRESS:} # Address given to players, required when enabled
 
 spring:
   datasource:

@@ -19,6 +19,14 @@ public class TwConfig {
 
     private String timezone = "UTC";
     private String news = "Welcome back to Tiger Woods PGA Tour 2004 online.";
+    private Relay relay = new Relay();
+
+    @Getter
+    @Setter
+    public static class Relay {
+        private boolean enabled;
+        private String publicAddress = "";
+    }
 
     /**
      * Get the clock that decides the tournament day
