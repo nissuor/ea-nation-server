@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -47,14 +48,19 @@ class BuddyServiceTest {
     }
 
     @Test
-    void authWithoutValidLkeyDoesNotBindPersona() {
+    void authWithoutValidLkeyClosesConnection() throws Exception {
         BuddySocketWrapper missingWrapper = new BuddySocketWrapper();
-        buddyService.auth(mock(Socket.class), new SocketData("AUTH", "PROD=test\nVERS=test\nNAME=player\n", null), missingWrapper);
+        Socket missingSocket = mock(Socket.class);
+        buddyService.auth(missingSocket, new SocketData("AUTH", "PROD=test\nVERS=test\nNAME=player\n", null), missingWrapper);
         assertNull(missingWrapper.getPersonaEntity());
+        verify(missingSocket).close();
 
         BuddySocketWrapper invalidWrapper = new BuddySocketWrapper();
-        buddyService.auth(mock(Socket.class), new SocketData("AUTH", "PROD=test\nVERS=test\nLKEY=invalid\nNAME=player\n", null), invalidWrapper);
+        Socket invalidSocket = mock(Socket.class);
+        buddyService.auth(invalidSocket, new SocketData("AUTH", "PROD=test\nVERS=test\nLKEY=invalid\nNAME=player\n", null), invalidWrapper);
         assertNull(invalidWrapper.getPersonaEntity());
+        verify(invalidSocket).close();
+        verify(socketWriter, never()).write(any(), any());
     }
 
     @Test

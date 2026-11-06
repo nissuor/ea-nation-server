@@ -16,6 +16,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.IOException;
 import java.net.Socket;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -48,11 +49,22 @@ public class BuddyService {
         String vers = getValueFromSocket(socketData.getInputMessage(), "VERS");
         String lkey = getValueFromSocket(socketData.getInputMessage(), "LKEY");
 
+        PersonaEntity persona;
         synchronized (this) {
             buddySocketWrapper.setLkey(lkey);
             buddySocketWrapper.setVers(vers);
-            PersonaEntity persona = getPersonaFromAriesSocket(buddySocketWrapper);
+            persona = getPersonaFromAriesSocket(buddySocketWrapper);
             buddySocketWrapper.setPersonaEntity(persona);
+        }
+
+        if (persona == null) {
+            log.warn("Closing buddy connection after unsuccessful session binding");
+            try {
+                socket.close();
+            } catch (IOException e) {
+                log.debug("Buddy connection was already closed", e);
+            }
+            return;
         }
 
         Map<String, String> content = Stream.of(new String[][]{
