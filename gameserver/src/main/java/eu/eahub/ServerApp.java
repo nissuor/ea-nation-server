@@ -37,8 +37,6 @@ import java.util.function.Function;
 @SpringBootApplication(exclude = {SecurityAutoConfiguration.class})
 public class ServerApp implements CommandLineRunner {
 
-    // Read timeout of accepted sockets, six times the ping interval of TcpSocketThread
-    private static final int SOCKET_READ_TIMEOUT = 120_000;
     private final ScheduledExecutorService dataCleanupThread = Executors.newSingleThreadScheduledExecutor();
     private final Props props;
     private final ServerConfig serverConfig;
@@ -115,7 +113,6 @@ public class ServerApp implements CommandLineRunner {
             try {
                 while (true) {
                     Socket socket = serverSocket.accept();
-                    socket.setSoTimeout(SOCKET_READ_TIMEOUT);
                     if (!(socket instanceof SSLSocket)) {
                         if (isAries) {
                             socketManager.addSocket(socket.getRemoteSocketAddress().toString(), socket);
